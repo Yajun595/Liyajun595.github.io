@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    <meta charset="utf-8">
+
+    
+
+    <!-- 渲染优化 -->
+    <meta name="renderer" content="webkit">
+    <meta name="force-rendering" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+    <meta name="HandheldFriendly" content="True" >
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+    <!--icon-->
+
+    
+    
+        <link rel="icon" type="image/png" sizes="16x16" href="/function%20small()%20%7B%20%5Bnative%20code%5D%20%7D">
+    
+    
+    
+    
+
+
+    <!-- meta -->
+
+
+<title>Spark 存储系统7—BlockManager | 大白</title>
+
+
+    <meta name="keywords" content="大数据, Spark">
+
+
+
+
+    <!-- OpenGraph -->
+ 
+    <meta name="description" content="终于到 BlockManager 了，按照惯例，先看构造方法 1234567891011121314151617181920212223242526272829303132333435363738394041424344454647484950515253545556575859606162636465666768697071727374757677787980818283848586878889">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark 存储系统7—BlockManager">
+<meta property="og:url" content="http://example.com/2021/12/01/Spark%20%E5%AD%98%E5%82%A8%E7%B3%BB%E7%BB%9F7%E2%80%94BlockManager/index.html">
+<meta property="og:site_name" content="大白">
+<meta property="og:description" content="终于到 BlockManager 了，按照惯例，先看构造方法 1234567891011121314151617181920212223242526272829303132333435363738394041424344454647484950515253545556575859606162636465666768697071727374757677787980818283848586878889">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210923223455">
+<meta property="article:published_time" content="2021-12-01T12:27:00.000Z">
+<meta property="article:modified_time" content="2022-03-03T16:55:34.473Z">
+<meta property="article:author" content="yajun Li">
+<meta property="article:tag" content="大数据">
+<meta property="article:tag" content="Spark">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210923223455">
+
+
+    
+<link rel="stylesheet" href="/css/style/main.css">
+ 
+
+    
+    
+        <link rel="stylesheet" id="hl-default-theme" href="/css/highlight/github.css" media="none" >
+        
+    
+
+    
+    
+
+    
+    
+<link rel="stylesheet" href="/css/style/dark.css">
+
+    
+<script src="/js/darkmode.js"></script>
+
+
+
+     
+    <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+ 
+
+    <!-- custom head -->
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+    <body>
+        <div id="app">
+            <header class="header">
+    <div class="header__left">
+        <a href="/" class="button">
+            <span class="logo__text">大白</span>
+        </a>
+    </div>
+    <div class="header__right">
+        
+            <div class="navbar__menus">
+                
+                    <a href="/" class="navbar-menu button">首页</a>
+                
+                    <a href="/tags/" class="navbar-menu button">标签</a>
+                
+                    <a href="/archives/" class="navbar-menu button">归档</a>
+                
+            </div>
+        
+        
+        
+    <a href="/search/" id="btn-search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="24" height="24" fill="currentColor" stroke="currentColor" stroke-width="32"><path d="M192 448c0-141.152 114.848-256 256-256s256 114.848 256 256-114.848 256-256 256-256-114.848-256-256z m710.624 409.376l-206.88-206.88A318.784 318.784 0 0 0 768 448c0-176.736-143.264-320-320-320S128 271.264 128 448s143.264 320 320 320a318.784 318.784 0 0 0 202.496-72.256l206.88 206.88 45.248-45.248z"></path></svg>
+    </a>
+
+
+        
+        
+    <a href="javaScript:void(0);" id="btn-toggle-dark">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </a>
+
+
+        
+            <a class="dropdown-icon button" id="btn-dropdown" tabindex="0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width='24' height='24' fill="none" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round"><path fill="currentColor" d="M3.314,4.8h13.372c0.41,0,0.743-0.333,0.743-0.743c0-0.41-0.333-0.743-0.743-0.743H3.314c-0.41,0-0.743,0.333-0.743,0.743C2.571,4.467,2.904,4.8,3.314,4.8z M16.686,15.2H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,15.2,16.686,15.2z M16.686,9.257H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,9.257,16.686,9.257z"></path></svg></a>
+            <div class="dropdown-menus" id="dropdown-menus">
+                
+                    <a href="/" class="dropdown-menu button">首页</a>
+                
+                    <a href="/tags/" class="dropdown-menu button">标签</a>
+                
+                    <a href="/archives/" class="dropdown-menu button">归档</a>
+                
+            </div>
+        
+    </div>
+</header>
+
+
+            <main class="main">
+    
+
+<div class="post-title">
+    <h1 class="post-title__text">
+        Spark 存储系统7—BlockManager
+    </h1>
+    <div class="post-title__meta">
+        <a href="/archives/2021/12/" class="post-meta__date button">2021-12-01</a>
+        
+ 
+        
+    
+     
+    <span id="busuanzi_container_page_pv" hidden>
+        <span class="separate-dot"></span>
+        <span></span>
+        <span id="busuanzi_value_page_pv"></span>
+        <span>Views</span>
+    </span>
+
+
+
+ 
+
+ 
+		| 本篇文章共<span class="post-count">4.4k字</span>，预计阅读<span class="post-count">20分钟</span>
+    </div>
+</div>
+
+
+
+<article class="post content-card">
+    <div class="post__header"></div>
+    <div class="post__content">
+        <p>终于到 BlockManager 了，按照惯例，先看构造方法</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[spark] <span class="class"><span class="keyword">class</span> <span class="title">BlockManager</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="class">    executorId: <span class="type">String</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    rpcEnv: <span class="type">RpcEnv</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    val master: <span class="type">BlockManagerMaster</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    val serializerManager: <span class="type">SerializerManager</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    val conf: <span class="type">SparkConf</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    memoryManager: <span class="type">MemoryManager</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    mapOutputTracker: <span class="type">MapOutputTracker</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    shuffleManager: <span class="type">ShuffleManager</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    val blockTransferService: <span class="type">BlockTransferService</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    securityManager: <span class="type">SecurityManager</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    externalBlockStoreClient: <span class="type">Option</span>[<span class="type">ExternalBlockStoreClient</span>]</span>)</span></span><br><span class="line">  <span class="keyword">extends</span> <span class="type">BlockDataManager</span> <span class="keyword">with</span> <span class="type">BlockEvictionHandler</span> <span class="keyword">with</span> <span class="type">Logging</span> &#123;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 是否开启外部 shuffle 服务。传统的 shuffle 是由 Executor 执行，但是 CPU 和 IO 都比较密集，Executor 的负载可能比较高。如果 Spark 部署在 YARN 上，开启外部 Shuffle 服务就会在 YARN 上跑一个常驻的 YarnShuffleService，用来收取和分配 Shuffle 数据，以降低 Executor 的负载。由 spark.shuffle.service.enabled 参数指定，默认关闭</span></span><br><span class="line">  <span class="keyword">private</span>[spark] <span class="keyword">val</span> externalShuffleServiceEnabled: <span class="type">Boolean</span> = externalBlockStoreClient.isDefined</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 远程读取 NIO buffer 版本，由 spark.network.remoteReadNioBufferConversion 控制，默认 2.4.0</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> remoteReadNioBufferConversion =</span><br><span class="line">    conf.get(<span class="type">Network</span>.<span class="type">NETWORK_REMOTE_READ_NIO_BUFFER_CONVERSION</span>)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 子文件夹目录</span></span><br><span class="line">  <span class="keyword">private</span>[spark] <span class="keyword">val</span> subDirsPerLocalDir = conf.get(config.<span class="type">DISKSTORE_SUB_DIRECTORIES</span>)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">val</span> diskBlockManager = &#123;</span><br><span class="line">    <span class="keyword">val</span> deleteFilesOnStop =</span><br><span class="line">      !externalShuffleServiceEnabled || executorId == <span class="type">SparkContext</span>.<span class="type">DRIVER_IDENTIFIER</span></span><br><span class="line">    <span class="keyword">new</span> <span class="type">DiskBlockManager</span>(conf, deleteFilesOnStop)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Visible for testing</span></span><br><span class="line">  <span class="keyword">private</span>[storage] <span class="keyword">val</span> blockInfoManager = <span class="keyword">new</span> <span class="type">BlockInfoManager</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 异步执行 BlockManager 一些操作的线程池，大小为 128</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> futureExecutionContext = <span class="type">ExecutionContext</span>.fromExecutorService(</span><br><span class="line">    <span class="type">ThreadUtils</span>.newDaemonCachedThreadPool(<span class="string">&quot;block-manager-future&quot;</span>, <span class="number">128</span>))</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">  <span class="keyword">private</span>[spark] <span class="keyword">val</span> memoryStore =</span><br><span class="line">    <span class="keyword">new</span> <span class="type">MemoryStore</span>(conf, blockInfoManager, serializerManager, memoryManager, <span class="keyword">this</span>)</span><br><span class="line">  <span class="keyword">private</span>[spark] <span class="keyword">val</span> diskStore = <span class="keyword">new</span> <span class="type">DiskStore</span>(conf, diskBlockManager, securityManager)</span><br><span class="line">  memoryManager.setMemoryStore(memoryStore)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 最大堆内、对外存储内存</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> maxOnHeapMemory = memoryManager.maxOnHeapStorageMemory</span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> maxOffHeapMemory = memoryManager.maxOffHeapStorageMemory</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 外部 shuffle service 端口</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> externalShuffleServicePort = <span class="type">StorageUtils</span>.externalShuffleServicePort(conf)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 该BlockManager的ID</span></span><br><span class="line">  <span class="keyword">var</span> blockManagerId: <span class="type">BlockManagerId</span> = _</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 用来保存 Shuffle 中间文件的实体 ID，如果不用外部 shuffle service 的话，就与本 blockManagerId 相同，否则就新建一个</span></span><br><span class="line">  <span class="keyword">private</span>[spark] <span class="keyword">var</span> shuffleServerId: <span class="type">BlockManagerId</span> = _</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 用于获取其他Executor上的Shuffle文件的客户端。</span></span><br><span class="line">  <span class="keyword">private</span>[spark] <span class="keyword">val</span> blockStoreClient = externalBlockStoreClient.getOrElse(blockTransferService)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Max number of failures before this block manager refreshes the block locations from the driver</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> maxFailuresBeforeLocationRefresh =</span><br><span class="line">    conf.get(config.<span class="type">BLOCK_FAILURES_BEFORE_LOCATION_REFRESH</span>)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> storageEndpoint = rpcEnv.setupEndpoint(</span><br><span class="line">    <span class="string">&quot;BlockManagerEndpoint&quot;</span> + <span class="type">BlockManager</span>.<span class="type">ID_GENERATOR</span>.next,</span><br><span class="line">    <span class="keyword">new</span> <span class="type">BlockManagerStorageEndpoint</span>(rpcEnv, <span class="keyword">this</span>, mapOutputTracker))</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Pending re-registration action being executed asynchronously or null if none is pending.</span></span><br><span class="line">  <span class="comment">// Accesses should synchronize on asyncReregisterLock.</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">var</span> asyncReregisterTask: <span class="type">Future</span>[<span class="type">Unit</span>] = <span class="literal">null</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> asyncReregisterLock = <span class="keyword">new</span> <span class="type">Object</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// Field related to peer block managers that are necessary for block replication</span></span><br><span class="line">  <span class="meta">@volatile</span> <span class="keyword">private</span> <span class="keyword">var</span> cachedPeers: <span class="type">Seq</span>[<span class="type">BlockManagerId</span>] = _</span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> peerFetchLock = <span class="keyword">new</span> <span class="type">Object</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">var</span> lastPeerFetchTimeNs = <span class="number">0</span>L</span><br><span class="line"></span><br><span class="line"> <span class="comment">// Spark中块复制的策略，由 spark.storage.replication.policy 控制，默认 RandomBlockReplicationPolicy，将块的副本随机放到不同的节点上</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">var</span> blockReplicationPolicy: <span class="type">BlockReplicationPolicy</span> = _</span><br><span class="line"></span><br><span class="line">  <span class="comment">// This is volatile since if it&#x27;s defined we should not accept remote blocks.</span></span><br><span class="line">  <span class="meta">@volatile</span> <span class="keyword">private</span> <span class="keyword">var</span> decommissioner: <span class="type">Option</span>[<span class="type">BlockManagerDecommissioner</span>] = <span class="type">None</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// A DownloadFileManager used to track all the files of remote blocks which are above the</span></span><br><span class="line">  <span class="comment">// specified memory threshold. Files will be deleted automatically based on weak reference.</span></span><br><span class="line">  <span class="comment">// Exposed for test</span></span><br><span class="line">  <span class="keyword">private</span>[storage] <span class="keyword">val</span> remoteBlockTempFileManager =</span><br><span class="line">    <span class="keyword">new</span> <span class="type">BlockManager</span>.<span class="type">RemoteBlockDownloadFileManager</span>(<span class="keyword">this</span>)</span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> maxRemoteBlockToMem = conf.get(config.<span class="type">MAX_REMOTE_BLOCK_SIZE_FETCH_TO_MEM</span>)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">var</span> hostLocalDirManager: <span class="type">Option</span>[<span class="type">HostLocalDirManager</span>] = <span class="type">None</span></span><br><span class="line"></span><br><span class="line">&#125;  </span><br></pre></td></tr></table></figure>
+
+<p><code>BlockManager</code> 的初始化，在 <code>SparkEnv</code> 中调用 <code>BlockManager#initialize</code> 方法进行初始化</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">initialize</span></span>(appId: <span class="type">String</span>): <span class="type">Unit</span> = &#123;</span><br><span class="line">    blockTransferService.init(<span class="keyword">this</span>)</span><br><span class="line">    externalBlockStoreClient.foreach &#123; blockStoreClient =&gt;</span><br><span class="line">      blockStoreClient.init(appId)</span><br><span class="line">    &#125;</span><br><span class="line">    blockReplicationPolicy = &#123;</span><br><span class="line">      <span class="keyword">val</span> priorityClass = conf.get(config.<span class="type">STORAGE_REPLICATION_POLICY</span>)</span><br><span class="line">      <span class="keyword">val</span> clazz = <span class="type">Utils</span>.classForName(priorityClass)</span><br><span class="line">      <span class="keyword">val</span> ret = clazz.getConstructor().newInstance().asInstanceOf[<span class="type">BlockReplicationPolicy</span>]</span><br><span class="line">      logInfo(<span class="string">s&quot;Using <span class="subst">$priorityClass</span> for block replication policy&quot;</span>)</span><br><span class="line">      ret</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">val</span> id =</span><br><span class="line">      <span class="type">BlockManagerId</span>(executorId, blockTransferService.hostName, blockTransferService.port, <span class="type">None</span>)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">val</span> idFromMaster = master.registerBlockManager(</span><br><span class="line">      id,</span><br><span class="line">      diskBlockManager.localDirsString,</span><br><span class="line">      maxOnHeapMemory,</span><br><span class="line">      maxOffHeapMemory,</span><br><span class="line">      storageEndpoint)</span><br><span class="line"></span><br><span class="line">    blockManagerId = <span class="keyword">if</span> (idFromMaster != <span class="literal">null</span>) idFromMaster <span class="keyword">else</span> id</span><br><span class="line"></span><br><span class="line">    shuffleServerId = <span class="keyword">if</span> (externalShuffleServiceEnabled) &#123;</span><br><span class="line">      logInfo(<span class="string">s&quot;external shuffle service port = <span class="subst">$externalShuffleServicePort</span>&quot;</span>)</span><br><span class="line">      <span class="type">BlockManagerId</span>(executorId, blockTransferService.hostName, externalShuffleServicePort)</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      blockManagerId</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Register Executors&#x27; configuration with the local shuffle service, if one should exist.</span></span><br><span class="line">    <span class="keyword">if</span> (externalShuffleServiceEnabled &amp;&amp; !blockManagerId.isDriver) &#123;</span><br><span class="line">      registerWithExternalShuffleServer()</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    hostLocalDirManager =</span><br><span class="line">      <span class="keyword">if</span> (conf.get(config.<span class="type">SHUFFLE_HOST_LOCAL_DISK_READING_ENABLED</span>) &amp;&amp;</span><br><span class="line">          !conf.get(config.<span class="type">SHUFFLE_USE_OLD_FETCH_PROTOCOL</span>)) &#123;</span><br><span class="line">        externalBlockStoreClient.map &#123; blockStoreClient =&gt;</span><br><span class="line">          <span class="keyword">new</span> <span class="type">HostLocalDirManager</span>(</span><br><span class="line">            futureExecutionContext,</span><br><span class="line">            conf.get(config.<span class="type">STORAGE_LOCAL_DISK_BY_EXECUTORS_CACHE_SIZE</span>),</span><br><span class="line">            blockStoreClient,</span><br><span class="line">            blockManagerId.host,</span><br><span class="line">            externalShuffleServicePort)</span><br><span class="line">        &#125;</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="type">None</span></span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">    logInfo(<span class="string">s&quot;Initialized BlockManager: <span class="subst">$blockManagerId</span>&quot;</span>)</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+<p>初始化步骤：</p>
+<ol>
+<li>初始化 BlockTransferService 和 BlockStoreClient</li>
+<li>初始化 <code>blockReplicationPolicy</code></li>
+<li>根据 <code>ExecutorId</code> 创建 <code>BlockManagerId</code>，并调用 <code>BlockManagerMaster.registerBlockManager()</code> 方法注册此 ID 与从 RPC 端点。注册成功后，<code>BlockManagerMaster</code> 会返回另一个正式的 ID</li>
+<li>生成 <code>Shuffle</code> 服务的 ID。如果当前节点是 <code>Executor</code> 并启用了外部 <code>Shuffle</code> 服务的话，就调用 <code>registerWithExternalShuffleServer()</code> 方法注册外部 <code>Shuffle</code> 服务</li>
+<li>创建 <code>HostLocalDirManager</code></li>
+</ol>
+<p>接下来将从块的读与写两个方面展开。</p>
+<p>块的读取：</p>
+<p>在BlockManager中提供了多种对块进行读写的方法，其中一个将读写进行统一的入口是getOrElseUpdate()方法。因为块可以由RDD物化而来，因此我们可以方便地在RDD类中（具体来说是RDD.getOrCompute()方法）找到对它的调用。为了方便分析，本文就由它来入手。先顺便看一下源码吧。</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">getOrElseUpdate</span></span>[<span class="type">T</span>](</span><br><span class="line">    blockId: <span class="type">BlockId</span>,</span><br><span class="line">    level: <span class="type">StorageLevel</span>,</span><br><span class="line">    classTag: <span class="type">ClassTag</span>[<span class="type">T</span>],</span><br><span class="line">    makeIterator: () =&gt; <span class="type">Iterator</span>[<span class="type">T</span>]): <span class="type">Either</span>[<span class="type">BlockResult</span>, <span class="type">Iterator</span>[<span class="type">T</span>]] = &#123;</span><br><span class="line"> </span><br><span class="line"> <span class="comment">// 从本地或这远程获取 Block</span></span><br><span class="line">  get[<span class="type">T</span>](blockId)(classTag) <span class="keyword">match</span> &#123;</span><br><span class="line">    <span class="keyword">case</span> <span class="type">Some</span>(block) =&gt;</span><br><span class="line">      <span class="keyword">return</span> <span class="type">Left</span>(block)</span><br><span class="line">    <span class="keyword">case</span> _ =&gt;</span><br><span class="line">      <span class="comment">// Need to compute the block.</span></span><br><span class="line">  &#125;</span><br><span class="line"> </span><br><span class="line">  doPutIterator(blockId, makeIterator, level, classTag, keepReadLock = <span class="literal">true</span>) <span class="keyword">match</span> &#123;</span><br><span class="line">    <span class="keyword">case</span> <span class="type">None</span> =&gt;</span><br><span class="line">      <span class="keyword">val</span> blockResult = getLocalValues(blockId).getOrElse &#123;</span><br><span class="line">        releaseLock(blockId)</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> <span class="type">SparkException</span>(<span class="string">s&quot;get() failed for block <span class="subst">$blockId</span> even though we held a lock&quot;</span>)</span><br><span class="line">      &#125;</span><br><span class="line">      releaseLock(blockId)</span><br><span class="line">      <span class="type">Left</span>(blockResult)</span><br><span class="line">    <span class="keyword">case</span> <span class="type">Some</span>(iter) =&gt;</span><br><span class="line">     <span class="type">Right</span>(iter)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>首先会根据 <code>blockId</code> 从本地或者远程拉取 <code>Blcok</code> 数据，如果本地或者远程都没有，则会根据 <code>makeIterator</code> 函数将数据转换成迭代器并写入，最终封装成 <code>BlockResult</code> 返回，写入部分我们放到后面看，先看看是怎么从本地或者远程拉取数据的。</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get</span></span>[<span class="type">T</span>: <span class="type">ClassTag</span>](blockId: <span class="type">BlockId</span>): <span class="type">Option</span>[<span class="type">BlockResult</span>] = &#123;</span><br><span class="line">  <span class="keyword">val</span> local = getLocalValues(blockId)</span><br><span class="line">  <span class="keyword">if</span> (local.isDefined) &#123;</span><br><span class="line">    logInfo(<span class="string">s&quot;Found block <span class="subst">$blockId</span> locally&quot;</span>)</span><br><span class="line">    <span class="keyword">return</span> local</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">val</span> remote = getRemoteValues[<span class="type">T</span>](blockId)</span><br><span class="line">  <span class="keyword">if</span> (remote.isDefined) &#123;</span><br><span class="line">    logInfo(<span class="string">s&quot;Found block <span class="subst">$blockId</span> remotely&quot;</span>)</span><br><span class="line">    <span class="keyword">return</span> remote</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="type">None</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>从上面可以看到，先尝试从本地拉取数据，如果本地没有则会从远程拉取</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">getLocalValues</span></span>(blockId: <span class="type">BlockId</span>): <span class="type">Option</span>[<span class="type">BlockResult</span>] = &#123;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 先尝试加读锁</span></span><br><span class="line">  blockInfoManager.lockForReading(blockId) <span class="keyword">match</span> &#123;</span><br><span class="line">    <span class="keyword">case</span> <span class="type">None</span> =&gt;</span><br><span class="line">      <span class="type">None</span></span><br><span class="line">    <span class="keyword">case</span> <span class="type">Some</span>(info) =&gt;</span><br><span class="line">      <span class="comment">// 存储等级</span></span><br><span class="line">      <span class="keyword">val</span> level = info.level</span><br><span class="line">      <span class="keyword">val</span> taskContext = <span class="type">Option</span>(<span class="type">TaskContext</span>.get())</span><br><span class="line">      </span><br><span class="line">      <span class="comment">// 如果存储等级使用到了内存，并且内存中有这个 block</span></span><br><span class="line">      <span class="keyword">if</span> (level.useMemory &amp;&amp; memoryStore.contains(blockId)) &#123;</span><br><span class="line">          </span><br><span class="line">        <span class="comment">// 如果存储的是对象数据，则调用 memoryStore.getValues 获取</span></span><br><span class="line">        <span class="keyword">val</span> iter: <span class="type">Iterator</span>[<span class="type">Any</span>] = <span class="keyword">if</span> (level.deserialized) &#123;</span><br><span class="line">          memoryStore.getValues(blockId).get</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">          <span class="comment">// 如果存储的是序列化数据，则调用 memoryStore.getBytes，并进行反序列化</span></span><br><span class="line">          serializerManager.dataDeserializeStream(</span><br><span class="line">            blockId, memoryStore.getBytes(blockId).get.toInputStream())(info.classTag)</span><br><span class="line">        &#125;</span><br><span class="line">       </span><br><span class="line">        <span class="comment">// 完成读取，释放锁</span></span><br><span class="line">        <span class="keyword">val</span> ci = <span class="type">CompletionIterator</span>[<span class="type">Any</span>, <span class="type">Iterator</span>[<span class="type">Any</span>]](iter, &#123;</span><br><span class="line">          releaseLock(blockId, taskContext)</span><br><span class="line">        &#125;)</span><br><span class="line">        <span class="type">Some</span>(<span class="keyword">new</span> <span class="type">BlockResult</span>(ci, <span class="type">DataReadMethod</span>.<span class="type">Memory</span>, info.size))</span><br><span class="line">          </span><br><span class="line">        <span class="comment">// 如果内存中没有，或者存储等级没有使用内存，则判断该 block 的存储等级是否使用磁盘，并判断磁盘中是否包含该 block</span></span><br><span class="line">      &#125; <span class="keyword">else</span> <span class="keyword">if</span> (level.useDisk &amp;&amp; diskStore.contains(blockId)) &#123;</span><br><span class="line">          </span><br><span class="line">        <span class="comment">// 从磁盘中块数据的字节流</span></span><br><span class="line">        <span class="keyword">val</span> diskData = diskStore.getBytes(blockId)</span><br><span class="line">        <span class="keyword">val</span> iterToReturn: <span class="type">Iterator</span>[<span class="type">Any</span>] = &#123;</span><br><span class="line">          <span class="keyword">if</span> (level.deserialized) &#123;</span><br><span class="line">            <span class="comment">// 反序列化</span></span><br><span class="line">            <span class="keyword">val</span> diskValues = serializerManager.dataDeserializeStream(</span><br><span class="line">              blockId,</span><br><span class="line">              diskData.toInputStream())(info.classTag)</span><br><span class="line">            maybeCacheDiskValuesInMemory(info, blockId, level, diskValues)</span><br><span class="line">          &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="keyword">val</span> stream = maybeCacheDiskBytesInMemory(info, blockId, level, diskData)</span><br><span class="line">              .map &#123; _.toInputStream(dispose = <span class="literal">false</span>) &#125;</span><br><span class="line">              .getOrElse &#123; diskData.toInputStream() &#125;</span><br><span class="line">            serializerManager.dataDeserializeStream(blockId, stream)(info.classTag)</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 完成读取，释放锁</span></span><br><span class="line">        <span class="keyword">val</span> ci = <span class="type">CompletionIterator</span>[<span class="type">Any</span>, <span class="type">Iterator</span>[<span class="type">Any</span>]](iterToReturn, &#123;</span><br><span class="line">          releaseLockAndDispose(blockId, diskData, taskContext)</span><br><span class="line">        &#125;)</span><br><span class="line">        <span class="type">Some</span>(<span class="keyword">new</span> <span class="type">BlockResult</span>(ci, <span class="type">DataReadMethod</span>.<span class="type">Disk</span>, info.size))</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// 本地没有数据</span></span><br><span class="line">        handleLocalReadFailure(blockId)</span><br><span class="line">      &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>大致流程：</p>
+<ol>
+<li>根据 <code>blockId</code> 加读锁，并尝试返回对应块元数据 <code>BlockInfo</code></li>
+<li>如果没有加上读锁或者没有返回 <code>BlockInfo</code> 表示该块没有存储在本地，否则根据 <code>StorageLevel</code> 判断按内存、磁盘的优先级进行数据读取</li>
+<li>如果 <code>StorageLevel</code> 使用到了内存，并且 <code>MemoryStore</code> 中存储了数据，根据是否序列化调用 <code>getValues</code> 或者 <code>getBytes</code>，获取块数据的迭代器表示，封装到 <code>BlockResult</code> 中返回，并释放锁。</li>
+<li>如果内存中没有数据，并且 <code>StorageLevel</code> 使用到了磁盘，且 <code>DiskStore</code> 中存储了数据，调用 <code>diskStore.getBytes</code> 获取磁盘中的数据流，然后根据是否序列化做不同处理。其中还会调用 <code>maybeCacheDiskValuesInMemory</code> 或 <code>maybeCacheDiskBytesInMemory</code> 尝试将数据缓存到内存中，以加快速度。获取块数据的迭代器表示，封装到 <code>BlockResult</code> 中返回，并释放锁。</li>
+<li>如果从内存和磁盘都读取失败，调用 <code>handleLocalReadFailure</code> 方法处理本地读取错误</li>
+</ol>
+<p>从远程读取数据</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[spark] <span class="function"><span class="keyword">def</span> <span class="title">getRemoteValues</span></span>[<span class="type">T</span>: <span class="type">ClassTag</span>](blockId: <span class="type">BlockId</span>): <span class="type">Option</span>[<span class="type">BlockResult</span>] = &#123;</span><br><span class="line">  <span class="keyword">val</span> ct = implicitly[<span class="type">ClassTag</span>[<span class="type">T</span>]]</span><br><span class="line">  getRemoteBlock(blockId, (data: <span class="type">ManagedBuffer</span>) =&gt; &#123;</span><br><span class="line">    <span class="keyword">val</span> values =</span><br><span class="line">      serializerManager.dataDeserializeStream(blockId, data.createInputStream())(ct)</span><br><span class="line">    <span class="keyword">new</span> <span class="type">BlockResult</span>(values, <span class="type">DataReadMethod</span>.<span class="type">Network</span>, data.size)</span><br><span class="line">  &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个方法主要是调用 <code>getRemoteBlock</code> 返回远程数据。因为远程数据必须要通过序列化才能传输，从远程先获取字节流，数据到本地后先进行反序列化。</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[spark] <span class="function"><span class="keyword">def</span> <span class="title">getRemoteBlock</span></span>[<span class="type">T</span>](</span><br><span class="line">    blockId: <span class="type">BlockId</span>,</span><br><span class="line">    bufferTransformer: <span class="type">ManagedBuffer</span> =&gt; <span class="type">T</span>): <span class="type">Option</span>[<span class="type">T</span>] = &#123;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 因为所有的远程数据信息都会注册到 driver 中，所以只需要向 driver 询问数据的位置</span></span><br><span class="line">  <span class="keyword">val</span> locationsAndStatusOption = master.getLocationsAndStatus(blockId, blockManagerId.host)</span><br><span class="line">  <span class="keyword">if</span> (locationsAndStatusOption.isEmpty) &#123;</span><br><span class="line">    logDebug(<span class="string">s&quot;Block <span class="subst">$blockId</span> is unknown by block manager master&quot;</span>)</span><br><span class="line">    <span class="type">None</span></span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="keyword">val</span> locationsAndStatus = locationsAndStatusOption.get</span><br><span class="line">      </span><br><span class="line">    <span class="comment">// 根据 locationsAndStatus: BlockLocationsAndStatus 获取 block 的大小</span></span><br><span class="line">    <span class="keyword">val</span> blockSize = locationsAndStatus.status.diskSize.max(locationsAndStatus.status.memSize)</span><br><span class="line"></span><br><span class="line">    locationsAndStatus.localDirs.flatMap &#123; localDirs =&gt;</span><br><span class="line">      <span class="comment">// 如果获取到数据是在同一主机，则尝试从本机获取 ManagedBuffer</span></span><br><span class="line">      <span class="keyword">val</span> blockDataOption =</span><br><span class="line">        readDiskBlockFromSameHostExecutor(blockId, localDirs, locationsAndStatus.status.diskSize)</span><br><span class="line">      <span class="keyword">val</span> res = blockDataOption.flatMap &#123; blockData =&gt;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">          <span class="comment">// 根据传入 bufferTransformer 函数进行反序列化</span></span><br><span class="line">          <span class="type">Some</span>(bufferTransformer(blockData))</span><br><span class="line">        &#125; <span class="keyword">catch</span> &#123;</span><br><span class="line">          <span class="keyword">case</span> <span class="type">NonFatal</span>(e) =&gt;</span><br><span class="line">            logDebug(<span class="string">&quot;Block from the same host executor cannot be opened: &quot;</span>, e)</span><br><span class="line">            <span class="type">None</span></span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">      logInfo(<span class="string">s&quot;Read <span class="subst">$blockId</span> from the disk of a same host executor is &quot;</span> +</span><br><span class="line">        (<span class="keyword">if</span> (res.isDefined) <span class="string">&quot;successful.&quot;</span> <span class="keyword">else</span> <span class="string">&quot;failed.&quot;</span>))</span><br><span class="line">      res</span><br><span class="line">    &#125;.orElse &#123;</span><br><span class="line">      <span class="comment">// 从远程拉取数据</span></span><br><span class="line">      fetchRemoteManagedBuffer(blockId, blockSize, locationsAndStatus).map(bufferTransformer)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>大致流程：</p>
+<ol>
+<li>向 driver 询问 block 的位置信息</li>
+<li>根据 <code>BlockLocationsAndStatus</code> 获取 block 大小</li>
+<li>如果数据是在本机（一台主机上有多个 Executor，可能其他 Executor 有这份数据），尝试从本机获取 <code>ManagedBuffer</code>，并进行反序列化</li>
+<li>如果数据不在本机，则从远程拉取</li>
+</ol>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[spark] <span class="function"><span class="keyword">def</span> <span class="title">readDiskBlockFromSameHostExecutor</span></span>(</span><br><span class="line">    blockId: <span class="type">BlockId</span>,</span><br><span class="line">    localDirs: <span class="type">Array</span>[<span class="type">String</span>],</span><br><span class="line">    blockSize: <span class="type">Long</span>): <span class="type">Option</span>[<span class="type">ManagedBuffer</span>] = &#123;</span><br><span class="line">    </span><br><span class="line">  <span class="comment">// 获取本地文件</span></span><br><span class="line">  <span class="keyword">val</span> file = <span class="type">ExecutorDiskUtils</span>.getFile(localDirs, subDirsPerLocalDir, blockId.name)</span><br><span class="line">  <span class="keyword">if</span> (file.exists()) &#123;</span><br><span class="line">    <span class="keyword">val</span> mangedBuffer = securityManager.getIOEncryptionKey() <span class="keyword">match</span> &#123;</span><br><span class="line">      <span class="keyword">case</span> <span class="type">Some</span>(key) =&gt;</span><br><span class="line">        <span class="comment">// 加密数据</span></span><br><span class="line">        <span class="keyword">new</span> <span class="type">EncryptedManagedBuffer</span>(</span><br><span class="line">          <span class="keyword">new</span> <span class="type">EncryptedBlockData</span>(file, blockSize, conf, key))</span><br><span class="line"></span><br><span class="line">      <span class="keyword">case</span> _ =&gt;</span><br><span class="line">        <span class="keyword">val</span> transportConf = <span class="type">SparkTransportConf</span>.fromSparkConf(conf, <span class="string">&quot;shuffle&quot;</span>)</span><br><span class="line">        <span class="comment">// NIO 的方式读取，此处不展开</span></span><br><span class="line">        <span class="keyword">new</span> <span class="type">FileSegmentManagedBuffer</span>(transportConf, file, <span class="number">0</span>, file.length)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="type">Some</span>(mangedBuffer)</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="type">None</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ol>
+<li>先尝试获取本地文件</li>
+<li>根据是否加密进行不同处理</li>
+<li>如果是不加密数据，封装成 <code>FileSegmentManagedBuffer</code> 进行读取</li>
+</ol>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">fetchRemoteManagedBuffer</span></span>(</span><br><span class="line">    blockId: <span class="type">BlockId</span>,</span><br><span class="line">    blockSize: <span class="type">Long</span>,</span><br><span class="line">    locationsAndStatus: <span class="type">BlockManagerMessages</span>.<span class="type">BlockLocationsAndStatus</span>): <span class="type">Option</span>[<span class="type">ManagedBuffer</span>] = &#123;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 如果块大小超过 spark.network.maxRemoteBlockSizeFetchToMem，关于 maxRemoteBlockToMem，官方是这么说的：</span></span><br><span class="line">  <span class="comment">// 如果消息大于2 GB, fetch-to-mem 肯定会失败，所以在这种情况下我们也可以使用fetch-to-disk。消息除了块数据本身之外还包括一些元数据(特别是UploadBlock有很多元数据)，所以我们留出了额外的空间。</span></span><br><span class="line">  <span class="comment">// 如果 fetch-to-mem 不能大于 2GB 时（Executor 内存不够？），阈值为 200MB</span></span><br><span class="line">  <span class="keyword">val</span> tempFileManager = <span class="keyword">if</span> (blockSize &gt; maxRemoteBlockToMem) &#123;</span><br><span class="line">    remoteBlockTempFileManager</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="literal">null</span></span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">var</span> runningFailureCount = <span class="number">0</span></span><br><span class="line">  <span class="keyword">var</span> totalFailureCount = <span class="number">0</span></span><br><span class="line">  <span class="comment">// 进行排序。处于同一台服务器上的BlockManager排在最前，然后是同一机架上的节点的BlockManager（前提是能够感知到机架），最后才是不同机架的节点上的BlockManager。</span></span><br><span class="line">  <span class="keyword">val</span> locations = sortLocations(locationsAndStatus.locations)</span><br><span class="line">  <span class="keyword">val</span> maxFetchFailures = locations.size</span><br><span class="line">  <span class="keyword">var</span> locationIterator = locations.iterator</span><br><span class="line">  <span class="keyword">while</span> (locationIterator.hasNext) &#123;</span><br><span class="line">    <span class="keyword">val</span> loc = locationIterator.next()</span><br><span class="line">    <span class="keyword">val</span> data = <span class="keyword">try</span> &#123;</span><br><span class="line">      <span class="comment">// 根据远近顺序获取数据</span></span><br><span class="line">      <span class="keyword">val</span> buf = blockTransferService.fetchBlockSync(loc.host, loc.port, loc.executorId,</span><br><span class="line">        blockId.toString, tempFileManager)</span><br><span class="line">      <span class="keyword">if</span> (blockSize &gt; <span class="number">0</span> &amp;&amp; buf.size() == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> <span class="type">IllegalStateException</span>(<span class="string">&quot;Empty buffer received for non empty block&quot;</span>)</span><br><span class="line">      &#125;</span><br><span class="line">      buf</span><br><span class="line">    &#125; <span class="keyword">catch</span> &#123;</span><br><span class="line">      <span class="keyword">case</span> <span class="type">NonFatal</span>(e) =&gt;</span><br><span class="line">        runningFailureCount += <span class="number">1</span></span><br><span class="line">        totalFailureCount += <span class="number">1</span></span><br><span class="line">  <span class="comment">// 总失败次数大于包含 block 的机器</span></span><br><span class="line">        <span class="keyword">if</span> (totalFailureCount &gt;= maxFetchFailures) &#123;</span><br><span class="line">          <span class="keyword">return</span> <span class="type">None</span></span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 有时我们的数据可能会在大量的 Executor 中，这样会导致大量的重试，所以设定一个阈值，刷新块位置</span></span><br><span class="line">  <span class="comment">// 运行次数大于 spark.block.failures.beforeLocationRefresh 默认 5 次</span></span><br><span class="line">        <span class="keyword">if</span> (runningFailureCount &gt;= maxFailuresBeforeLocationRefresh) &#123;</span><br><span class="line">          locationIterator = sortLocations(master.getLocations(blockId)).iterator</span><br><span class="line">          runningFailureCount = <span class="number">0</span></span><br><span class="line">        &#125;</span><br><span class="line">        <span class="literal">null</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (data != <span class="literal">null</span>) &#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="type">Some</span>(data)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="type">None</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>大致流程：</p>
+<ol>
+<li>先对 block 位置按照，本机、本机架、其它进行排序</li>
+<li>根据远近顺序获取数据</li>
+<li>如果失败次数大于 block 位置数，直接返回 None</li>
+<li>第 3 条有时候会导致大量重试，所以设定一个阈值，刷新块位置</li>
+</ol>
+<p>接上之前的写入流程，在 <code>getOrElseUpdate</code> 中会调用 <code>duPutiterator</code> 进行写入</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">doPutIterator</span></span>[<span class="type">T</span>](</span><br><span class="line">    blockId: <span class="type">BlockId</span>,</span><br><span class="line">    iterator: () =&gt; <span class="type">Iterator</span>[<span class="type">T</span>],</span><br><span class="line">    level: <span class="type">StorageLevel</span>,</span><br><span class="line">    classTag: <span class="type">ClassTag</span>[<span class="type">T</span>],</span><br><span class="line">    tellMaster: <span class="type">Boolean</span> = <span class="literal">true</span>,</span><br><span class="line">    keepReadLock: <span class="type">Boolean</span> = <span class="literal">false</span>): <span class="type">Option</span>[<span class="type">PartiallyUnrolledIterator</span>[<span class="type">T</span>]] = &#123;</span><br><span class="line">  doPut(blockId, level, classTag, tellMaster = tellMaster, keepReadLock = keepReadLock) &#123; info =&gt;</span><br><span class="line">    <span class="keyword">val</span> startTimeNs = <span class="type">System</span>.nanoTime()</span><br><span class="line">    <span class="keyword">var</span> iteratorFromFailedMemoryStorePut: <span class="type">Option</span>[<span class="type">PartiallyUnrolledIterator</span>[<span class="type">T</span>]] = <span class="type">None</span></span><br><span class="line">    <span class="keyword">var</span> size = <span class="number">0</span>L</span><br><span class="line">      </span><br><span class="line">    <span class="keyword">if</span> (level.useMemory) &#123;</span><br><span class="line">      <span class="comment">// 如果 StorageLevel 使用内存</span></span><br><span class="line">      <span class="keyword">if</span> (level.deserialized) &#123;</span><br><span class="line">        <span class="comment">// 如果存储的是对象，调用 putIteratorAsValues</span></span><br><span class="line">        memoryStore.putIteratorAsValues(blockId, iterator(), classTag) <span class="keyword">match</span> &#123;</span><br><span class="line">          <span class="keyword">case</span> <span class="type">Right</span>(s) =&gt;</span><br><span class="line">            size = s</span><br><span class="line">          <span class="keyword">case</span> <span class="type">Left</span>(iter) =&gt;</span><br><span class="line">            <span class="comment">// 内存中没有足够的空间，判断是否使用硬盘</span></span><br><span class="line">            <span class="keyword">if</span> (level.useDisk) &#123;</span><br><span class="line">              logWarning(<span class="string">s&quot;Persisting block <span class="subst">$blockId</span> to disk instead.&quot;</span>)</span><br><span class="line">              diskStore.put(blockId) &#123; channel =&gt;</span><br><span class="line">                <span class="keyword">val</span> out = <span class="type">Channels</span>.newOutputStream(channel)</span><br><span class="line">                <span class="comment">// 序列化写入磁盘</span></span><br><span class="line">                serializerManager.dataSerializeStream(blockId, out, iter)(classTag)</span><br><span class="line">              &#125;</span><br><span class="line">              size = diskStore.getSize(blockId)</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">              <span class="comment">// 内存中没有足够的空间，并且不使用硬盘，一般只有 MEMORY_ONLY 才会发生这种情况</span></span><br><span class="line">              iteratorFromFailedMemoryStorePut = <span class="type">Some</span>(iter)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// 存储序列化数据，调用 putIteratorAsBytes</span></span><br><span class="line">        memoryStore.putIteratorAsBytes(blockId, iterator(), classTag, level.memoryMode) <span class="keyword">match</span> &#123;</span><br><span class="line">          <span class="keyword">case</span> <span class="type">Right</span>(s) =&gt;</span><br><span class="line">            size = s</span><br><span class="line">          <span class="keyword">case</span> <span class="type">Left</span>(partiallySerializedValues) =&gt;</span><br><span class="line">            <span class="comment">// 与上面一样</span></span><br><span class="line">            <span class="keyword">if</span> (level.useDisk) &#123;</span><br><span class="line">              diskStore.put(blockId) &#123; channel =&gt;</span><br><span class="line">                <span class="keyword">val</span> out = <span class="type">Channels</span>.newOutputStream(channel)</span><br><span class="line">                partiallySerializedValues.finishWritingToStream(out)</span><br><span class="line">              &#125;</span><br><span class="line">              size = diskStore.getSize(blockId)</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">              iteratorFromFailedMemoryStorePut = <span class="type">Some</span>(partiallySerializedValues.valuesIterator)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (level.useDisk) &#123;</span><br><span class="line">      <span class="comment">// 不使用内存，只使用硬盘，一般为 DISK_ONLY</span></span><br><span class="line">      diskStore.put(blockId) &#123; channel =&gt;</span><br><span class="line">        <span class="keyword">val</span> out = <span class="type">Channels</span>.newOutputStream(channel)、</span><br><span class="line">        <span class="comment">// 只有序列化之后的数据才能存到硬盘中</span></span><br><span class="line">        serializerManager.dataSerializeStream(blockId, out, iterator())(classTag)</span><br><span class="line">      &#125;</span><br><span class="line">      size = diskStore.getSize(blockId)</span><br><span class="line">    &#125;</span><br><span class="line"> </span><br><span class="line">    <span class="comment">// 当前的存储状态，以及验证是否符合 StorageLevel(使用内存、磁盘以及副本数)</span></span><br><span class="line">    <span class="keyword">val</span> putBlockStatus = getCurrentBlockStatus(blockId, info)</span><br><span class="line">    <span class="keyword">val</span> blockWasSuccessfullyStored = putBlockStatus.storageLevel.isValid</span><br><span class="line">    <span class="keyword">if</span> (blockWasSuccessfullyStored) &#123;</span><br><span class="line">      <span class="comment">// Now that the block is in either the memory or disk store, tell the master about it.</span></span><br><span class="line">      info.size = size</span><br><span class="line">      <span class="keyword">if</span> (tellMaster &amp;&amp; info.tellMaster) &#123;</span><br><span class="line">        reportBlockStatus(blockId, putBlockStatus)</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="comment">// 更新 Metrics</span></span><br><span class="line">      addUpdatedBlockStatusToTaskMetrics(blockId, putBlockStatus)</span><br><span class="line">      <span class="keyword">if</span> (level.replication &gt; <span class="number">1</span>) &#123;</span><br><span class="line">        <span class="comment">// 如果副本数大于 1，要进行副本的复制</span></span><br><span class="line">        <span class="keyword">val</span> remoteStartTimeNs = <span class="type">System</span>.nanoTime()</span><br><span class="line">        <span class="comment">// 获取本地序列化后的数据，大体与 getLocalValues 类似，只不过会将存储的对象序列化返回</span></span><br><span class="line">        <span class="keyword">val</span> bytesToReplicate = doGetLocalBytes(blockId, info)</span><br><span class="line">        <span class="keyword">val</span> remoteClassTag = <span class="keyword">if</span> (!serializerManager.canUseKryo(classTag)) &#123;</span><br><span class="line">          scala.reflect.classTag[<span class="type">Any</span>]</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">          classTag</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">          <span class="comment">// 复制副本</span></span><br><span class="line">          replicate(blockId, bytesToReplicate, level, remoteClassTag)</span><br><span class="line">        &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">          bytesToReplicate.dispose()</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 返回已经写入的数据</span></span><br><span class="line">    iteratorFromFailedMemoryStorePut</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>可以看到 <code>doPutIterator</code> 方法的本质其实是调用 <code>doPut</code>  方法，整个写入的逻辑作为一个函数，作为 <code>doPut</code> 方法的柯里化参数。数据的写入与数据的读取流程差不多，只不过读取变成了写入，大致流程：</p>
+<ol>
+<li>判断 <code>StorageLevel</code> 是否使用内存，如果是，判断是否存储为对象</li>
+<li>调用 <code>memoryStore.putIteratorAsValues</code> 进行写入，如果写入失败，再判断是否使用硬盘，如果是将数据序列化写入硬盘，如果没使用硬盘，返回写入成功部分。</li>
+<li>如果存储为序列化数据，调用 <code>memoryStore.putIteratorAsBytes</code> 进行写入，后续流程与上述差不多</li>
+<li>如果不使用内存，只使用硬盘，将数据序列化写入硬盘</li>
+<li>判断存储状态，验证是否符合 <code>StorageLevel</code> 要求</li>
+<li>更新 <code>Metrics</code></li>
+<li>如果副本数大于 1，从本地取出序列化后的数据，复制副本</li>
+</ol>
+<p>再来看下 <code>doPut</code> 方法</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">doPut</span></span>[<span class="type">T</span>](</span><br><span class="line">    blockId: <span class="type">BlockId</span>,</span><br><span class="line">    level: <span class="type">StorageLevel</span>,</span><br><span class="line">    classTag: <span class="type">ClassTag</span>[_],</span><br><span class="line">    tellMaster: <span class="type">Boolean</span>,</span><br><span class="line">    keepReadLock: <span class="type">Boolean</span>)(putBody: <span class="type">BlockInfo</span> =&gt; <span class="type">Option</span>[<span class="type">T</span>]): <span class="type">Option</span>[<span class="type">T</span>] = &#123;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">val</span> putBlockInfo = &#123;</span><br><span class="line">    <span class="keyword">val</span> newInfo = <span class="keyword">new</span> <span class="type">BlockInfo</span>(level, classTag, tellMaster)</span><br><span class="line">    <span class="comment">// 尝试加新块写锁</span></span><br><span class="line">    <span class="keyword">if</span> (blockInfoManager.lockNewBlockForWriting(blockId, newInfo)) &#123;</span><br><span class="line">      newInfo</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      <span class="keyword">if</span> (!keepReadLock) &#123;</span><br><span class="line">        <span class="comment">// 已经有读锁，表示 block 已经写入，则不需要再写</span></span><br><span class="line">        releaseLock(blockId)</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">return</span> <span class="type">None</span></span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">val</span> startTimeNs = <span class="type">System</span>.nanoTime()</span><br><span class="line">  <span class="keyword">var</span> exceptionWasThrown: <span class="type">Boolean</span> = <span class="literal">true</span></span><br><span class="line">  <span class="keyword">val</span> result: <span class="type">Option</span>[<span class="type">T</span>] = <span class="keyword">try</span> &#123;</span><br><span class="line">    <span class="comment">// duPutIterator 流程</span></span><br><span class="line">    <span class="keyword">val</span> res = putBody(putBlockInfo)</span><br><span class="line">    exceptionWasThrown = <span class="literal">false</span></span><br><span class="line">    <span class="keyword">if</span> (res.isEmpty) &#123;</span><br><span class="line">      <span class="comment">// 之前 doPutiterator 只有写入失败才会给 iteratorFromFailedMemoryStorePut 赋值</span></span><br><span class="line">      <span class="comment">// 也就是说如果 iteratorFromFailedMemoryStorePut 为空，表示都写入成功了</span></span><br><span class="line">      <span class="keyword">if</span> (keepReadLock) &#123;</span><br><span class="line">        <span class="comment">// 如果需要保持读锁，就进行锁降级，否则就释放锁</span></span><br><span class="line">        blockInfoManager.downgradeLock(blockId)</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        blockInfoManager.unlock(blockId)</span><br><span class="line">      &#125;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      <span class="comment">// 删除已经写入的部分</span></span><br><span class="line">      removeBlockInternal(blockId, tellMaster = <span class="literal">false</span>)</span><br><span class="line">    &#125;</span><br><span class="line">    res</span><br><span class="line">  &#125; <span class="keyword">catch</span> &#123;</span><br><span class="line">    <span class="keyword">case</span> <span class="type">NonFatal</span>(e) =&gt;</span><br><span class="line">      <span class="keyword">throw</span> e</span><br><span class="line">  &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (exceptionWasThrown) &#123;</span><br><span class="line">      <span class="comment">// 删除已经写入的部分</span></span><br><span class="line">      removeBlockInternal(blockId, tellMaster = tellMaster)</span><br><span class="line">      addUpdatedBlockStatusToTaskMetrics(blockId, <span class="type">BlockStatus</span>.empty)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">val</span> usedTimeMs = <span class="type">Utils</span>.getUsedTimeNs(startTimeNs)</span><br><span class="line">  <span class="keyword">if</span> (level.replication &gt; <span class="number">1</span>) &#123;</span><br><span class="line">    logDebug(<span class="string">s&quot;Putting block <span class="subst">$&#123;blockId&#125;</span> with replication took <span class="subst">$usedTimeMs</span>&quot;</span>)</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    logDebug(<span class="string">s&quot;Putting block <span class="subst">$&#123;blockId&#125;</span> without replication took <span class="subst">$&#123;usedTimeMs&#125;</span>&quot;</span>)</span><br><span class="line">  &#125;</span><br><span class="line">  result</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>doPut</code> 挺简单的，大致流程：</p>
+<ol>
+<li>尝试加新块写入锁，如果已经有读锁在，表示 block 已经存在，不需要再写了。</li>
+<li>执行 <code>doPutIterator</code> 函数流程，进行写入</li>
+<li>如果写入失败，删除已经写入的</li>
+</ol>
+<p>最后再来看下如何复制副本</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">replicate</span></span>(</span><br><span class="line">    blockId: <span class="type">BlockId</span>,</span><br><span class="line">    data: <span class="type">BlockData</span>,</span><br><span class="line">    level: <span class="type">StorageLevel</span>,</span><br><span class="line">    classTag: <span class="type">ClassTag</span>[_],</span><br><span class="line">    existingReplicas: <span class="type">Set</span>[<span class="type">BlockManagerId</span>] = <span class="type">Set</span>.empty,</span><br><span class="line">    maxReplicationFailures: <span class="type">Option</span>[<span class="type">Int</span>] = <span class="type">None</span>): <span class="type">Boolean</span> = &#123;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 最大失败次数，由 spark.storage.maxReplicationFailures 控制，默认 1 次</span></span><br><span class="line">  <span class="keyword">val</span> maxReplicationFailureCount = maxReplicationFailures.getOrElse(</span><br><span class="line">    conf.get(config.<span class="type">STORAGE_MAX_REPLICATION_FAILURE</span>))</span><br><span class="line">    </span><br><span class="line">  <span class="comment">// StorageLevel，这里的副本数为 1，因为复制之后，其它 BlockManager 不需要再复制了</span></span><br><span class="line">  <span class="keyword">val</span> tLevel = <span class="type">StorageLevel</span>(</span><br><span class="line">    useDisk = level.useDisk,</span><br><span class="line">    useMemory = level.useMemory,</span><br><span class="line">    useOffHeap = level.useOffHeap,</span><br><span class="line">    deserialized = level.deserialized,</span><br><span class="line">    replication = <span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">val</span> numPeersToReplicateTo = level.replication - <span class="number">1</span></span><br><span class="line">  <span class="keyword">val</span> startTime = <span class="type">System</span>.nanoTime</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 已经复制的副本</span></span><br><span class="line">  <span class="keyword">val</span> peersReplicatedTo = mutable.<span class="type">HashSet</span>.empty ++ existingReplicas</span><br><span class="line">  <span class="comment">// 复制失败的副本</span></span><br><span class="line">  <span class="keyword">val</span> peersFailedToReplicateTo = mutable.<span class="type">HashSet</span>.empty[<span class="type">BlockManagerId</span>]</span><br><span class="line">  <span class="keyword">var</span> numFailures = <span class="number">0</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 其它 blockManager</span></span><br><span class="line">  <span class="keyword">val</span> initialPeers = getPeers(<span class="literal">false</span>).filterNot(existingReplicas.contains)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 副本复制策略，默认为随机策略</span></span><br><span class="line">  <span class="keyword">var</span> peersForReplication = blockReplicationPolicy.prioritize(</span><br><span class="line">    blockManagerId,</span><br><span class="line">    initialPeers,</span><br><span class="line">    peersReplicatedTo,</span><br><span class="line">    blockId,</span><br><span class="line">    numPeersToReplicateTo)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">while</span>(numFailures &lt;= maxReplicationFailureCount &amp;&amp;</span><br><span class="line">    !peersForReplication.isEmpty &amp;&amp;</span><br><span class="line">    peersReplicatedTo.size &lt; numPeersToReplicateTo) &#123;</span><br><span class="line">    <span class="keyword">val</span> peer = peersForReplication.head</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">      <span class="keyword">val</span> onePeerStartTime = <span class="type">System</span>.nanoTime</span><br><span class="line">	<span class="comment">// 封装成 buffer</span></span><br><span class="line">      <span class="keyword">val</span> buffer = <span class="keyword">new</span> <span class="type">BlockManagerManagedBuffer</span>(blockInfoManager, blockId, data, <span class="literal">false</span>,</span><br><span class="line">        unlockOnDeallocate = <span class="literal">false</span>)</span><br><span class="line">      <span class="comment">// 通过 blockTransferService 上传</span></span><br><span class="line">      blockTransferService.uploadBlockSync(</span><br><span class="line">        peer.host,</span><br><span class="line">        peer.port,</span><br><span class="line">        peer.executorId,</span><br><span class="line">        blockId,</span><br><span class="line">        buffer,</span><br><span class="line">        tLevel,</span><br><span class="line">        classTag)</span><br><span class="line">      peersForReplication = peersForReplication.tail</span><br><span class="line">      peersReplicatedTo += peer</span><br><span class="line">    &#125; <span class="keyword">catch</span> &#123;</span><br><span class="line">      <span class="keyword">case</span> e: <span class="type">InterruptedException</span> =&gt;</span><br><span class="line">        <span class="keyword">throw</span> e</span><br><span class="line">      <span class="keyword">case</span> <span class="type">NonFatal</span>(e) =&gt;</span><br><span class="line">        peersFailedToReplicateTo += peer</span><br><span class="line">        </span><br><span class="line">        <span class="comment">// 重新获取其它 blockManager, 过滤掉已经保存了副本的和复制副本失败的</span></span><br><span class="line">        <span class="keyword">val</span> filteredPeers = getPeers(<span class="literal">true</span>).filter &#123; p =&gt;</span><br><span class="line">          !peersFailedToReplicateTo.contains(p) &amp;&amp; !peersReplicatedTo.contains(p)</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        numFailures += <span class="number">1</span></span><br><span class="line">        peersForReplication = blockReplicationPolicy.prioritize(</span><br><span class="line">          blockManagerId,</span><br><span class="line">          filteredPeers,</span><br><span class="line">          peersReplicatedTo,</span><br><span class="line">          blockId,</span><br><span class="line">          numPeersToReplicateTo - peersReplicatedTo.size)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 复制的副本数小于 StorageLevle 要求副本数，失败</span></span><br><span class="line">  <span class="keyword">if</span> (peersReplicatedTo.size &lt; numPeersToReplicateTo) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>大致流程：</p>
+<ol>
+<li>通过 <code>peersReplicatedTo</code>、<code>peersFailedToReplicateTo</code> 记录已经成功复制副本和失败的 <code>BlockManager</code></li>
+<li>从缓存获取可以保存副本的 <code>BlockManager</code></li>
+<li>通过 <code>maxReplicationFailureCount</code> 最大失败次数控制重试次数，这里最大失败次数为 1，表示可以重试一次</li>
+<li>将数据封装成 <code>BlockManagerManagedBuffer</code>，通过 <code>BlockTransferService</code> 进行传输复制</li>
+<li>如果遇到异常，重新获取其它 blockManager（第二次会向 <code>BlockManagerMaster</code> 拉取，并更新缓存）, 过滤掉已经保存了副本的和复制副本失败的</li>
+<li>如果最终复制的副本数小于 <code>StorageLevle</code> 要求的副本数，返回 false，失败</li>
+</ol>
+<p><img src="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210923223455" class="lazy" data-srcset="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210923223455" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="img"></p>
+<p>参考资料：</p>
+<p><a target="_blank" rel="noopener" href="https://www.jianshu.com/p/49463b492be1">Spark Core源码精读计划#31：BlockManager块写入流程</a></p>
+<p>待学习<br>ExternalBlockStoreClient<br>NettyBlockTransferService<br>是如何获取远程数据的</p>
+
+    </div>
+     
+    <div class="post-footer__meta"><p>updated at 2022-03-04</p></div> 
+    <div class="post-entry__tags"><a href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="post-tags__link button"># 大数据</a><a href="/tags/Spark/" class="post-tags__link button"># Spark</a></div> 
+</article>
+
+
+    <div class="nav">
+        <div class="nav__prev">
+            
+                <a href="/2021/12/01/Spark%20%E5%AD%98%E5%82%A8%E7%B3%BB%E7%BB%9F6%E2%80%94DiskBlockManager%E3%80%81DiskStore/" class="nav__link">
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M589.088 790.624L310.464 512l278.624-278.624 45.248 45.248L400.96 512l233.376 233.376z" fill="#808080"></path></svg>
+                    </div>
+                    <div>
+                        <div class="nav__label">
+                            Previous Post
+                        </div>
+                        <div class="nav__title">
+                            Spark 存储系统6—DiskBlockManager、DiskStore
+                        </div>
+                    </div>
+                </a>
+            
+        </div>
+        <div class="nav__next">
+            
+                <a href="/2021/11/29/Spark%20%E7%BC%93%E5%AD%98/" class="nav__link">
+                    <div>
+                        <div class="nav__label">
+                            Next Post
+                        </div>
+                        <div class="nav__title">
+                            Spark 缓存
+                        </div>
+                    </div>
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M434.944 790.624l-45.248-45.248L623.04 512l-233.376-233.376 45.248-45.248L713.568 512z" fill="#808080"></path></svg>
+                    </div>
+                </a>
+            
+        </div>
+    </div>
+
+
+
+    <div class="post__comments content-card" id="comment">
+        
+    <h4>Comments</h4>
+    
+    
+    
+    
+    
+    <div id="gitalk-container"></div>
+
+    
+    
+    
+    
+    
+    
+
+
+    </div>
+
+
+
+</main>
+
+            <footer class="footer">
+     
+    <a href="#" class="button" id="b2t" aria-label="Back to Top" title="Back to Top">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="32" height="32">
+            <path d="M233.376 722.752L278.624 768 512 534.624 745.376 768l45.248-45.248L512 444.128zM192 352h640V288H192z" fill="currentColor"></path>
+        </svg>
+    </a>
+
+    
+
+
+    
+    
+    
+        <span id="busuanzi_container_site_uv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_uv"></span>
+            <span>Viewers</span>
+            
+                <span>|</span>
+            
+        </span>
+    
+    
+        <span id="busuanzi_container_site_pv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_pv"></span>
+            <span>Views</span>
+            
+        </span>
+    
+ 
+ 
+
+ 
+    
+        
+        <p class="footer-copyright">
+            Copyright © 2022 <a href="/">大白</a>
+        </p>
+    
+    
+    <p>Powered by <a href="https://hexo.io" target="_blank">Hexo</a> | Theme - <a href="https://github.com/ChrAlpha/hexo-theme-cards" target="_blank">Cards</a></p>
+</footer>
+
+        </div>
+        
+    <script defer src="https://cdn.jsdelivr.net/npm/vanilla-lazyload@17.1.0/dist/lazyload.min.js"></script>
+    <script>
+        window.lazyLoadOptions = {
+            elements_selector: ".lazy",
+            threshold: 0
+        };
+    </script>
+ 
+
+ 
+    <script>
+        window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+        ga('create', 'UA-178473615-1', 'auto');
+        ga('send', 'pageview');
+    </script>
+    <script async src="https://www.google-analytics.com/analytics.js"></script>
+ 
+
+ 
+
+ 
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement('script');
+            hm.src = 'https://hm.baidu.com/hm.js?fb2dded415192023dd108d2b441862de';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+ 
+
+ 
+
+
+
+ 
+
+
+
+ 
+
+
+    
+ 
+
+
+    
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.4.1/dist/jquery.min.js"></script>
+
+    
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.css">
+
+    
+<script src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.js"></script>
+
+    <script>
+        let lazyloadT = Boolean('true'),
+            auto_fancybox = Boolean('true')
+        if (auto_fancybox) {
+            $(".post__content").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        } else {
+            $(".post__content").find("fancybox").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        }
+    </script>
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+    
+
+    
+    
+    
+
+    
+    
+    
+    <script>
+        function loadComment() {
+            let e, i;
+            (e = document.createElement("script")).src = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js',
+            document.body.appendChild(e);
+            e.onload = () => {
+                var gitalk = new Gitalk({
+                    clientID: '5343251f7191333c2cf8',
+                    clientSecret: 'c0471f2aaeafdec2f9ad0edfd4df7404db114101',
+                    repo: 'big-white-2020.github.io',
+                    owner: 'big-white-2020',
+                    admin: 'big-white-2020',
+                    id: window.location.pathname,
+                    distractionFreeMode: false
+                });
+                gitalk.render('gitalk-container');
+            };
+            (i = document.createElement("link")).rel = "stylesheet",
+            i.href = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css',
+            document.head.appendChild(i);
+        }
+    
+        var runningOnBrowser = typeof window !== "undefined";
+        var isBot = runningOnBrowser && !("onscroll" in window) || typeof navigator !== "undefined" && /(gle|ing|ro|msn)bot|crawl|spider|yand|duckgo/i.test(navigator.userAgent);
+        var supportsIntersectionObserver = runningOnBrowser && "IntersectionObserver" in window;
+    
+        setTimeout(function () {
+            if (!isBot && supportsIntersectionObserver) {
+                var comment_observer = new IntersectionObserver(function(entries) {
+                    if (entries[0].isIntersecting) {
+                        loadComment();
+                        comment_observer.disconnect();
+                    }
+                }, { threshold: [0] });
+                comment_observer.observe(document.getElementById('comment'));
+            } else {
+                loadComment();
+            }
+        }, 1);
+    </script>
+
+    
+    
+
+    
+    
+    
+    
+    
+
+    
+    
+    
+
+
+
+    </body>
+</html>

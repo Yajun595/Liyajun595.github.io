@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    <meta charset="utf-8">
+
+    
+
+    <!-- 渲染优化 -->
+    <meta name="renderer" content="webkit">
+    <meta name="force-rendering" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+    <meta name="HandheldFriendly" content="True" >
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+    <!--icon-->
+
+    
+    
+        <link rel="icon" type="image/png" sizes="16x16" href="/function%20small()%20%7B%20%5Bnative%20code%5D%20%7D">
+    
+    
+    
+    
+
+
+    <!-- meta -->
+
+
+<title>Spark 存储系统3—内存管理 | 大白</title>
+
+
+    <meta name="keywords" content="大数据, Spark">
+
+
+
+
+    <!-- OpenGraph -->
+ 
+    <meta name="description" content="Spark 是基于 JVM 的应用程序，所以按照 JVM 层面可以把 Spark 的内存分为堆内（上）内存（on-heap）和堆外内存（off-heap）。如果按照 Spark 对内存管理层面区分的话，可以分为执行内存（Execution Memory）和存储内存（Storage Memory）。执行内存主要是存放 shuffle、join、sort 和 aggregation 操作数据；而存储内">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark 存储系统3—内存管理">
+<meta property="og:url" content="http://example.com/2021/12/01/Spark%20%E5%AD%98%E5%82%A8%E7%B3%BB%E7%BB%9F3%E2%80%94%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/index.html">
+<meta property="og:site_name" content="大白">
+<meta property="og:description" content="Spark 是基于 JVM 的应用程序，所以按照 JVM 层面可以把 Spark 的内存分为堆内（上）内存（on-heap）和堆外内存（off-heap）。如果按照 Spark 对内存管理层面区分的话，可以分为执行内存（Execution Memory）和存储内存（Storage Memory）。执行内存主要是存放 shuffle、join、sort 和 aggregation 操作数据；而存储内">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2021-12-01T12:27:00.000Z">
+<meta property="article:modified_time" content="2022-03-03T16:55:34.473Z">
+<meta property="article:author" content="yajun Li">
+<meta property="article:tag" content="大数据">
+<meta property="article:tag" content="Spark">
+<meta name="twitter:card" content="summary_large_image">
+
+
+    
+<link rel="stylesheet" href="/css/style/main.css">
+ 
+
+    
+    
+        <link rel="stylesheet" id="hl-default-theme" href="/css/highlight/github.css" media="none" >
+        
+    
+
+    
+    
+
+    
+    
+<link rel="stylesheet" href="/css/style/dark.css">
+
+    
+<script src="/js/darkmode.js"></script>
+
+
+
+     
+    <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+ 
+
+    <!-- custom head -->
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+    <body>
+        <div id="app">
+            <header class="header">
+    <div class="header__left">
+        <a href="/" class="button">
+            <span class="logo__text">大白</span>
+        </a>
+    </div>
+    <div class="header__right">
+        
+            <div class="navbar__menus">
+                
+                    <a href="/" class="navbar-menu button">首页</a>
+                
+                    <a href="/tags/" class="navbar-menu button">标签</a>
+                
+                    <a href="/archives/" class="navbar-menu button">归档</a>
+                
+            </div>
+        
+        
+        
+    <a href="/search/" id="btn-search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="24" height="24" fill="currentColor" stroke="currentColor" stroke-width="32"><path d="M192 448c0-141.152 114.848-256 256-256s256 114.848 256 256-114.848 256-256 256-256-114.848-256-256z m710.624 409.376l-206.88-206.88A318.784 318.784 0 0 0 768 448c0-176.736-143.264-320-320-320S128 271.264 128 448s143.264 320 320 320a318.784 318.784 0 0 0 202.496-72.256l206.88 206.88 45.248-45.248z"></path></svg>
+    </a>
+
+
+        
+        
+    <a href="javaScript:void(0);" id="btn-toggle-dark">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </a>
+
+
+        
+            <a class="dropdown-icon button" id="btn-dropdown" tabindex="0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width='24' height='24' fill="none" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round"><path fill="currentColor" d="M3.314,4.8h13.372c0.41,0,0.743-0.333,0.743-0.743c0-0.41-0.333-0.743-0.743-0.743H3.314c-0.41,0-0.743,0.333-0.743,0.743C2.571,4.467,2.904,4.8,3.314,4.8z M16.686,15.2H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,15.2,16.686,15.2z M16.686,9.257H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,9.257,16.686,9.257z"></path></svg></a>
+            <div class="dropdown-menus" id="dropdown-menus">
+                
+                    <a href="/" class="dropdown-menu button">首页</a>
+                
+                    <a href="/tags/" class="dropdown-menu button">标签</a>
+                
+                    <a href="/archives/" class="dropdown-menu button">归档</a>
+                
+            </div>
+        
+    </div>
+</header>
+
+
+            <main class="main">
+    
+
+<div class="post-title">
+    <h1 class="post-title__text">
+        Spark 存储系统3—内存管理
+    </h1>
+    <div class="post-title__meta">
+        <a href="/archives/2021/12/" class="post-meta__date button">2021-12-01</a>
+        
+ 
+        
+    
+     
+    <span id="busuanzi_container_page_pv" hidden>
+        <span class="separate-dot"></span>
+        <span></span>
+        <span id="busuanzi_value_page_pv"></span>
+        <span>Views</span>
+    </span>
+
+
+
+ 
+
+ 
+		| 本篇文章共<span class="post-count">1.2k字</span>，预计阅读<span class="post-count">5分钟</span>
+    </div>
+</div>
+
+
+
+<article class="post content-card">
+    <div class="post__header"></div>
+    <div class="post__content">
+        <p>Spark 是基于 JVM 的应用程序，所以按照 JVM 层面可以把 Spark 的内存分为堆内（上）内存（on-heap）和堆外内存（off-heap）。如果按照 Spark 对内存管理层面区分的话，可以分为执行内存（Execution Memory）和存储内存（Storage Memory）。执行内存主要是存放 <code>shuffle</code>、<code>join</code>、<code>sort</code> 和 <code>aggregation</code> 操作数据；而存储内存主要存放 <code>cache</code> 和 <code>broadcast</code> 等缓存数据。</p>
+<p>这次来了解一下 Spark 是如何管理内存的。与内存存储相关的组件包括内存池 <code>MemoryPool</code>、内存管理器 <code>MemoryManager</code>、内存存储器 <code>MemoryStore</code>。本文先来探索内存池和内存管理器的大体实现。先来看下 <code>MemoryPool</code></p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[memory] <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">MemoryPool</span>(<span class="params">lock: <span class="type">Object</span></span>) </span>&#123;</span><br><span class="line">    <span class="keyword">private</span>[<span class="keyword">this</span>] <span class="keyword">var</span> _poolSize: <span class="type">Long</span> = <span class="number">0</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">final</span> <span class="function"><span class="keyword">def</span> <span class="title">memoryFree</span></span>: <span class="type">Long</span> = lock.synchronized &#123;</span><br><span class="line">        _poolSize - memoryUsed</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">final</span> <span class="function"><span class="keyword">def</span> <span class="title">incrementPoolSize</span></span>(delta: <span class="type">Long</span>): <span class="type">Unit</span> = lock.synchronized &#123;</span><br><span class="line">        _poolSize += delta</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">final</span> <span class="function"><span class="keyword">def</span> <span class="title">decrementPoolSize</span></span>(delta: <span class="type">Long</span>): <span class="type">Unit</span> = lock.synchronized &#123;</span><br><span class="line">   		_poolSize -= delta</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="function"><span class="keyword">def</span> <span class="title">memoryUsed</span></span>: <span class="type">Long</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到 <code>MemoryPool</code> 仅仅定义了一个 <code>_poolSize</code> 表示 JVM 分配给 Spark 的内存大小，然后就是定义两个增加和减少可用内存的方法，这个抽象方法只是定义了如何记录增加和减少内存，具体可用内存和增加/减少的内存大小还是得看实现类 <code>ExecutionMemoryPool</code> 、<code>StorageMemeoryPool</code>对应存储执行内存管理和内存管理。</p>
+<p>看下具体实现类 <code>StorageMemoryPool</code></p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[memory] <span class="class"><span class="keyword">class</span> <span class="title">StorageMemoryPool</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="class">    lock: <span class="type">Object</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    memoryMode: <span class="type">MemoryMode</span></span></span></span><br><span class="line"><span class="params"><span class="class">  </span>) <span class="keyword">extends</span> <span class="title">MemoryPool</span>(<span class="params">lock</span>) <span class="keyword">with</span> <span class="title">Logging</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 对应之前的堆内和堆外内存</span></span><br><span class="line">  <span class="keyword">private</span>[<span class="keyword">this</span>] <span class="keyword">val</span> poolName: <span class="type">String</span> = memoryMode <span class="keyword">match</span> &#123;</span><br><span class="line">    <span class="keyword">case</span> <span class="type">MemoryMode</span>.<span class="type">ON_HEAP</span> =&gt; <span class="string">&quot;on-heap storage&quot;</span></span><br><span class="line">    <span class="keyword">case</span> <span class="type">MemoryMode</span>.<span class="type">OFF_HEAP</span> =&gt; <span class="string">&quot;off-heap storage&quot;</span></span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="meta">@GuardedBy</span>(<span class="string">&quot;lock&quot;</span>)</span><br><span class="line">  <span class="keyword">private</span>[<span class="keyword">this</span>] <span class="keyword">var</span> _memoryUsed: <span class="type">Long</span> = <span class="number">0</span>L</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">memoryUsed</span></span>: <span class="type">Long</span> = lock.synchronized &#123;</span><br><span class="line">    _memoryUsed</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// MemoryStore 是负责具体内存存取的</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">var</span> _memoryStore: <span class="type">MemoryStore</span> = _</span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">memoryStore</span></span>: <span class="type">MemoryStore</span> = &#123;</span><br><span class="line">    <span class="keyword">if</span> (_memoryStore == <span class="literal">null</span>) &#123;</span><br><span class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> <span class="type">IllegalStateException</span>(<span class="string">&quot;memory store not initialized yet&quot;</span>)</span><br><span class="line">    &#125;</span><br><span class="line">    _memoryStore</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>申请空间</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">acquireMemory</span></span>(blockId: <span class="type">BlockId</span>, numBytes: <span class="type">Long</span>): <span class="type">Boolean</span> = lock.synchronized &#123;</span><br><span class="line">    <span class="keyword">val</span> numBytesToFree = math.max(<span class="number">0</span>, numBytes - memoryFree)</span><br><span class="line">    acquireMemory(blockId, numBytes, numBytesToFree)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">acquireMemory</span></span>(</span><br><span class="line">    blockId: <span class="type">BlockId</span>,</span><br><span class="line">    numBytesToAcquire: <span class="type">Long</span>,</span><br><span class="line">    numBytesToFree: <span class="type">Long</span>): <span class="type">Boolean</span> = lock.synchronized &#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (numBytesToFree &gt; <span class="number">0</span>) &#123;</span><br><span class="line">      memoryStore.evictBlocksToFreeSpace(<span class="type">Some</span>(blockId), numBytesToFree, memoryMode)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">val</span> enoughMemory = numBytesToAcquire &lt;= memoryFree</span><br><span class="line">    <span class="keyword">if</span> (enoughMemory) &#123;</span><br><span class="line">      _memoryUsed += numBytesToAcquire</span><br><span class="line">    &#125;</span><br><span class="line">    enoughMemory</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>上面的大体流程为：</p>
+<ol>
+<li>一个 block 需要申请存储空间</li>
+<li>判断空闲空间是否够这次空间申请，如果不够就通过 <code>memoryStore#evictBlocksToFreeSpace</code> 释放出 <code>numBytes - memoryFree</code> 空间</li>
+<li>已使用空间数据记录 <code>_memoryUsed</code> 增加</li>
+</ol>
+<p>释放空间</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">releaseMemory</span></span>(size: <span class="type">Long</span>): <span class="type">Unit</span> = lock.synchronized &#123;</span><br><span class="line">  <span class="keyword">if</span> (size &gt; _memoryUsed) &#123;</span><br><span class="line">    logWarning(<span class="string">s&quot;Attempted to release <span class="subst">$size</span> bytes of storage &quot;</span> +</span><br><span class="line">      <span class="string">s&quot;memory when we only have <span class="subst">$&#123;_memoryUsed&#125;</span> bytes&quot;</span>)</span><br><span class="line">    _memoryUsed = <span class="number">0</span></span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    _memoryUsed -= size</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>释放空间就更加简单了，直接将 <code>_memoryUsed</code> 已使用空间减去需要释放的空间即可</p>
+<p>最后来看下 <code>MemoryManager</code>，<code>MemoryManager</code> 也是一个抽象方法，先看下有哪些属性</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[spark] <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">MemoryManager</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="class">    conf: <span class="type">SparkConf</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    numCores: <span class="type">Int</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    onHeapStorageMemory: <span class="type">Long</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    onHeapExecutionMemory: <span class="type">Long</span></span>) <span class="keyword">extends</span> <span class="title">Logging</span> </span>&#123;</span><br><span class="line">  </span><br><span class="line">  <span class="meta">@GuardedBy</span>(<span class="string">&quot;this&quot;</span>)</span><br><span class="line">  <span class="keyword">protected</span> <span class="keyword">val</span> onHeapStorageMemoryPool = <span class="keyword">new</span> <span class="type">StorageMemoryPool</span>(<span class="keyword">this</span>, <span class="type">MemoryMode</span>.<span class="type">ON_HEAP</span>)</span><br><span class="line">  <span class="meta">@GuardedBy</span>(<span class="string">&quot;this&quot;</span>)</span><br><span class="line">  <span class="keyword">protected</span> <span class="keyword">val</span> offHeapStorageMemoryPool = <span class="keyword">new</span> <span class="type">StorageMemoryPool</span>(<span class="keyword">this</span>, <span class="type">MemoryMode</span>.<span class="type">OFF_HEAP</span>)</span><br><span class="line">  <span class="meta">@GuardedBy</span>(<span class="string">&quot;this&quot;</span>)</span><br><span class="line">  <span class="keyword">protected</span> <span class="keyword">val</span> onHeapExecutionMemoryPool = <span class="keyword">new</span> <span class="type">ExecutionMemoryPool</span>(<span class="keyword">this</span>, <span class="type">MemoryMode</span>.<span class="type">ON_HEAP</span>)</span><br><span class="line">  <span class="meta">@GuardedBy</span>(<span class="string">&quot;this&quot;</span>)</span><br><span class="line">  <span class="keyword">protected</span> <span class="keyword">val</span> offHeapExecutionMemoryPool = <span class="keyword">new</span> <span class="type">ExecutionMemoryPool</span>(<span class="keyword">this</span>, <span class="type">MemoryMode</span>.<span class="type">OFF_HEAP</span>)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 给堆内的存储内存和执行内存分配空间</span></span><br><span class="line">  onHeapStorageMemoryPool.incrementPoolSize(onHeapStorageMemory)</span><br><span class="line">  onHeapExecutionMemoryPool.incrementPoolSize(onHeapExecutionMemory)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">protected</span>[<span class="keyword">this</span>] <span class="keyword">val</span> maxOffHeapMemory = conf.get(<span class="type">MEMORY_OFFHEAP_SIZE</span>)</span><br><span class="line">  <span class="keyword">protected</span>[<span class="keyword">this</span>] <span class="keyword">val</span> offHeapStorageMemory =</span><br><span class="line">    (maxOffHeapMemory * conf.get(<span class="type">MEMORY_STORAGE_FRACTION</span>)).toLong</span><br><span class="line"></span><br><span class="line">  offHeapExecutionMemoryPool.incrementPoolSize(maxOffHeapMemory - offHeapStorageMemory)</span><br><span class="line">  offHeapStorageMemoryPool.incrementPoolSize(offHeapStorageMemory)</span><br><span class="line"></span><br><span class="line">  ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>MemoryManager</code> 通过存储内存、执行内存与堆内、堆外内存组合出四种存储池，分别是堆内存储内存、堆外存储内存、堆内执行内存、堆外执行内存。</p>
+<p>分配初始内存时堆内是通过传入的参数确定的，而堆外则是通过配置进行计算的，这里涉及两个参数 <code>spark.memory.offHeap.size</code> 可用堆外内存总数（默认 0）<code>spark.memory.storageFraction</code> 堆外存储内存系数（默认 0.5）。先计算出堆外存储内存的大小，再通过堆外可用内存减去堆外存储内存得到堆外执行内存的大小</p>
+<p><code>MemoryManager</code> 中定义了 <code>acquireStorageMemory</code>、<code>acquireUnrollMemory</code>、<code>acquireExecutionMemory</code> 三个抽象方法，分配对应分配存储内存、Unroll 内存、执行内存这些都交由具体的子类去实现。这里解释一下 Unroll 内存，RDD在被缓存（cache）之前，它所占用的内存空间是不连续的，而被缓存到存储内存之后，就以块的形式来存储，占用连续的内存空间了。Unroll就是这个将RDD固化在连续内存空间的过程，中文一般翻译为“展开”。Unroll过程使用的内存空间就是展开内存，它本质上是存储内存中比较特殊的一部分。</p>
+<p>而释放空间则基本上是代理了 <code>MemoryPool</code> 就不再赘述。</p>
+<p>待补充</p>
+<p><code>ExecutionMemory</code></p>
+<p><code>unroll</code></p>
+<p><code>Tungsten</code> 计划</p>
+<p>参考资料</p>
+<p><a target="_blank" rel="noopener" href="https://www.jianshu.com/p/9fe9bf936ffa">Spark Core源码精读计划#23：与存储相关的内存池及内存管理器的具体实现</a></p>
+
+    </div>
+     
+    <div class="post-footer__meta"><p>updated at 2022-03-04</p></div> 
+    <div class="post-entry__tags"><a href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="post-tags__link button"># 大数据</a><a href="/tags/Spark/" class="post-tags__link button"># Spark</a></div> 
+</article>
+
+
+    <div class="nav">
+        <div class="nav__prev">
+            
+                <a href="/2021/12/01/Spark%20%E5%AD%98%E5%82%A8%E7%B3%BB%E7%BB%9F2%E2%80%94BlockInfoManager%20%E8%AF%BB%E5%86%99%E9%94%81%E7%AE%A1%E7%90%86/" class="nav__link">
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M589.088 790.624L310.464 512l278.624-278.624 45.248 45.248L400.96 512l233.376 233.376z" fill="#808080"></path></svg>
+                    </div>
+                    <div>
+                        <div class="nav__label">
+                            Previous Post
+                        </div>
+                        <div class="nav__title">
+                            Spark 存储系统2—BlockInfoManager 读写锁管理
+                        </div>
+                    </div>
+                </a>
+            
+        </div>
+        <div class="nav__next">
+            
+                <a href="/2021/12/01/Spark%20%E5%AD%98%E5%82%A8%E7%B3%BB%E7%BB%9F4%E2%80%94%E7%BB%9F%E4%B8%80%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86%E5%99%A8/" class="nav__link">
+                    <div>
+                        <div class="nav__label">
+                            Next Post
+                        </div>
+                        <div class="nav__title">
+                            Spark 存储系统4—统一内存管理器
+                        </div>
+                    </div>
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M434.944 790.624l-45.248-45.248L623.04 512l-233.376-233.376 45.248-45.248L713.568 512z" fill="#808080"></path></svg>
+                    </div>
+                </a>
+            
+        </div>
+    </div>
+
+
+
+    <div class="post__comments content-card" id="comment">
+        
+    <h4>Comments</h4>
+    
+    
+    
+    
+    
+    <div id="gitalk-container"></div>
+
+    
+    
+    
+    
+    
+    
+
+
+    </div>
+
+
+
+</main>
+
+            <footer class="footer">
+     
+    <a href="#" class="button" id="b2t" aria-label="Back to Top" title="Back to Top">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="32" height="32">
+            <path d="M233.376 722.752L278.624 768 512 534.624 745.376 768l45.248-45.248L512 444.128zM192 352h640V288H192z" fill="currentColor"></path>
+        </svg>
+    </a>
+
+    
+
+
+    
+    
+    
+        <span id="busuanzi_container_site_uv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_uv"></span>
+            <span>Viewers</span>
+            
+                <span>|</span>
+            
+        </span>
+    
+    
+        <span id="busuanzi_container_site_pv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_pv"></span>
+            <span>Views</span>
+            
+        </span>
+    
+ 
+ 
+
+ 
+    
+        
+        <p class="footer-copyright">
+            Copyright © 2022 <a href="/">大白</a>
+        </p>
+    
+    
+    <p>Powered by <a href="https://hexo.io" target="_blank">Hexo</a> | Theme - <a href="https://github.com/ChrAlpha/hexo-theme-cards" target="_blank">Cards</a></p>
+</footer>
+
+        </div>
+        
+    <script defer src="https://cdn.jsdelivr.net/npm/vanilla-lazyload@17.1.0/dist/lazyload.min.js"></script>
+    <script>
+        window.lazyLoadOptions = {
+            elements_selector: ".lazy",
+            threshold: 0
+        };
+    </script>
+ 
+
+ 
+    <script>
+        window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+        ga('create', 'UA-178473615-1', 'auto');
+        ga('send', 'pageview');
+    </script>
+    <script async src="https://www.google-analytics.com/analytics.js"></script>
+ 
+
+ 
+
+ 
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement('script');
+            hm.src = 'https://hm.baidu.com/hm.js?fb2dded415192023dd108d2b441862de';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+ 
+
+ 
+
+
+
+ 
+
+
+
+ 
+
+
+    
+ 
+
+
+    
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.4.1/dist/jquery.min.js"></script>
+
+    
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.css">
+
+    
+<script src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.js"></script>
+
+    <script>
+        let lazyloadT = Boolean('true'),
+            auto_fancybox = Boolean('true')
+        if (auto_fancybox) {
+            $(".post__content").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        } else {
+            $(".post__content").find("fancybox").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        }
+    </script>
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+    
+
+    
+    
+    
+
+    
+    
+    
+    <script>
+        function loadComment() {
+            let e, i;
+            (e = document.createElement("script")).src = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js',
+            document.body.appendChild(e);
+            e.onload = () => {
+                var gitalk = new Gitalk({
+                    clientID: '5343251f7191333c2cf8',
+                    clientSecret: 'c0471f2aaeafdec2f9ad0edfd4df7404db114101',
+                    repo: 'big-white-2020.github.io',
+                    owner: 'big-white-2020',
+                    admin: 'big-white-2020',
+                    id: window.location.pathname,
+                    distractionFreeMode: false
+                });
+                gitalk.render('gitalk-container');
+            };
+            (i = document.createElement("link")).rel = "stylesheet",
+            i.href = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css',
+            document.head.appendChild(i);
+        }
+    
+        var runningOnBrowser = typeof window !== "undefined";
+        var isBot = runningOnBrowser && !("onscroll" in window) || typeof navigator !== "undefined" && /(gle|ing|ro|msn)bot|crawl|spider|yand|duckgo/i.test(navigator.userAgent);
+        var supportsIntersectionObserver = runningOnBrowser && "IntersectionObserver" in window;
+    
+        setTimeout(function () {
+            if (!isBot && supportsIntersectionObserver) {
+                var comment_observer = new IntersectionObserver(function(entries) {
+                    if (entries[0].isIntersecting) {
+                        loadComment();
+                        comment_observer.disconnect();
+                    }
+                }, { threshold: [0] });
+                comment_observer.observe(document.getElementById('comment'));
+            } else {
+                loadComment();
+            }
+        }, 1);
+    </script>
+
+    
+    
+
+    
+    
+    
+    
+    
+
+    
+    
+    
+
+
+
+    </body>
+</html>

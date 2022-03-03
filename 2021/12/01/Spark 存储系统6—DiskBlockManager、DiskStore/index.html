@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    <meta charset="utf-8">
+
+    
+
+    <!-- 渲染优化 -->
+    <meta name="renderer" content="webkit">
+    <meta name="force-rendering" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+    <meta name="HandheldFriendly" content="True" >
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+    <!--icon-->
+
+    
+    
+        <link rel="icon" type="image/png" sizes="16x16" href="/function%20small()%20%7B%20%5Bnative%20code%5D%20%7D">
+    
+    
+    
+    
+
+
+    <!-- meta -->
+
+
+<title>Spark 存储系统6—DiskBlockManager、DiskStore | 大白</title>
+
+
+    <meta name="keywords" content="大数据, Spark">
+
+
+
+
+    <!-- OpenGraph -->
+ 
+    <meta name="description" content="关于内存的块管理已经差不多了，接下来看下基于硬盘的块管理。与内存管理的 MemoryManager 类似，硬盘管理有一个 DiskBlockManager。按照惯例，先看构造方法和属性 12345678910111213141516171819202122&#x2F;&#x2F; 构造方法由两个参数，conf 配置参数和 deleteFilesOnStop 关闭是是否删除文件private[spark] class">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark 存储系统6—DiskBlockManager、DiskStore">
+<meta property="og:url" content="http://example.com/2021/12/01/Spark%20%E5%AD%98%E5%82%A8%E7%B3%BB%E7%BB%9F6%E2%80%94DiskBlockManager%E3%80%81DiskStore/index.html">
+<meta property="og:site_name" content="大白">
+<meta property="og:description" content="关于内存的块管理已经差不多了，接下来看下基于硬盘的块管理。与内存管理的 MemoryManager 类似，硬盘管理有一个 DiskBlockManager。按照惯例，先看构造方法和属性 12345678910111213141516171819202122&#x2F;&#x2F; 构造方法由两个参数，conf 配置参数和 deleteFilesOnStop 关闭是是否删除文件private[spark] class">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2021-12-01T12:27:00.000Z">
+<meta property="article:modified_time" content="2022-03-03T16:55:34.473Z">
+<meta property="article:author" content="yajun Li">
+<meta property="article:tag" content="大数据">
+<meta property="article:tag" content="Spark">
+<meta name="twitter:card" content="summary_large_image">
+
+
+    
+<link rel="stylesheet" href="/css/style/main.css">
+ 
+
+    
+    
+        <link rel="stylesheet" id="hl-default-theme" href="/css/highlight/github.css" media="none" >
+        
+    
+
+    
+    
+
+    
+    
+<link rel="stylesheet" href="/css/style/dark.css">
+
+    
+<script src="/js/darkmode.js"></script>
+
+
+
+     
+    <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+ 
+
+    <!-- custom head -->
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+    <body>
+        <div id="app">
+            <header class="header">
+    <div class="header__left">
+        <a href="/" class="button">
+            <span class="logo__text">大白</span>
+        </a>
+    </div>
+    <div class="header__right">
+        
+            <div class="navbar__menus">
+                
+                    <a href="/" class="navbar-menu button">首页</a>
+                
+                    <a href="/tags/" class="navbar-menu button">标签</a>
+                
+                    <a href="/archives/" class="navbar-menu button">归档</a>
+                
+            </div>
+        
+        
+        
+    <a href="/search/" id="btn-search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="24" height="24" fill="currentColor" stroke="currentColor" stroke-width="32"><path d="M192 448c0-141.152 114.848-256 256-256s256 114.848 256 256-114.848 256-256 256-256-114.848-256-256z m710.624 409.376l-206.88-206.88A318.784 318.784 0 0 0 768 448c0-176.736-143.264-320-320-320S128 271.264 128 448s143.264 320 320 320a318.784 318.784 0 0 0 202.496-72.256l206.88 206.88 45.248-45.248z"></path></svg>
+    </a>
+
+
+        
+        
+    <a href="javaScript:void(0);" id="btn-toggle-dark">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </a>
+
+
+        
+            <a class="dropdown-icon button" id="btn-dropdown" tabindex="0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width='24' height='24' fill="none" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round"><path fill="currentColor" d="M3.314,4.8h13.372c0.41,0,0.743-0.333,0.743-0.743c0-0.41-0.333-0.743-0.743-0.743H3.314c-0.41,0-0.743,0.333-0.743,0.743C2.571,4.467,2.904,4.8,3.314,4.8z M16.686,15.2H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,15.2,16.686,15.2z M16.686,9.257H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,9.257,16.686,9.257z"></path></svg></a>
+            <div class="dropdown-menus" id="dropdown-menus">
+                
+                    <a href="/" class="dropdown-menu button">首页</a>
+                
+                    <a href="/tags/" class="dropdown-menu button">标签</a>
+                
+                    <a href="/archives/" class="dropdown-menu button">归档</a>
+                
+            </div>
+        
+    </div>
+</header>
+
+
+            <main class="main">
+    
+
+<div class="post-title">
+    <h1 class="post-title__text">
+        Spark 存储系统6—DiskBlockManager、DiskStore
+    </h1>
+    <div class="post-title__meta">
+        <a href="/archives/2021/12/" class="post-meta__date button">2021-12-01</a>
+        
+ 
+        
+    
+     
+    <span id="busuanzi_container_page_pv" hidden>
+        <span class="separate-dot"></span>
+        <span></span>
+        <span id="busuanzi_value_page_pv"></span>
+        <span>Views</span>
+    </span>
+
+
+
+ 
+
+ 
+		| 本篇文章共<span class="post-count">1.7k字</span>，预计阅读<span class="post-count">7分钟</span>
+    </div>
+</div>
+
+
+
+<article class="post content-card">
+    <div class="post__header"></div>
+    <div class="post__content">
+        <p>关于内存的块管理已经差不多了，接下来看下基于硬盘的块管理。<br>与内存管理的 <code>MemoryManager</code> 类似，硬盘管理有一个 <code>DiskBlockManager</code>。<br>按照惯例，先看构造方法和属性</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 构造方法由两个参数，conf 配置参数和 deleteFilesOnStop 关闭是是否删除文件</span></span><br><span class="line"><span class="keyword">private</span>[spark] <span class="class"><span class="keyword">class</span> <span class="title">DiskBlockManager</span>(<span class="params">conf: <span class="type">SparkConf</span>, deleteFilesOnStop: <span class="type">Boolean</span></span>) <span class="keyword">extends</span> <span class="title">Logging</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// diskStore 子目录数量，由 spark.diskStore.subDirectories 参数控制，默认 64</span></span><br><span class="line">  <span class="keyword">private</span>[spark] <span class="keyword">val</span> subDirsPerLocalDir = conf.get(config.<span class="type">DISKSTORE_SUB_DIRECTORIES</span>)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 根据 spark.local.dir 参数，创建一个本地目录，这里的本地目录会根据不同的提交模式创建在不同的目录，例如运行在 YARN 上，就会根据 contains 所在机器创建目录。</span></span><br><span class="line">  <span class="comment">// 创建目录后，会创建多个子文件夹，存储时根据 hash 判断存储在哪个子文件夹下</span></span><br><span class="line">  <span class="keyword">private</span>[spark] <span class="keyword">val</span> localDirs: <span class="type">Array</span>[<span class="type">File</span>] = createLocalDirs(conf)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 文件夹路径，spark.local.dir 可以配置多个</span></span><br><span class="line">  <span class="keyword">private</span>[spark] <span class="keyword">val</span> localDirsString: <span class="type">Array</span>[<span class="type">String</span>] = localDirs.map(_.toString)</span><br><span class="line"></span><br><span class="line">  mutable. <span class="type">And</span> the content</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 子文件夹路径，是一个二维数组，[父文件夹路径[子文件]]</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> subDirs = <span class="type">Array</span>.fill(localDirs.length)(<span class="keyword">new</span> <span class="type">Array</span>[<span class="type">File</span>](subDirsPerLocalDir))</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 停止任务的钩子</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> shutdownHook = addShutdownHook()</span><br><span class="line"> ... </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>看下是如何找到一个文件的</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">getFile</span></span>(blockId: <span class="type">BlockId</span>): <span class="type">File</span> = getFile(blockId.name)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">getFile</span></span>(filename: <span class="type">String</span>): <span class="type">File</span> = &#123;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">val</span> hash = <span class="type">Utils</span>.nonNegativeHash(filename)</span><br><span class="line">  <span class="keyword">val</span> dirId = hash % localDirs.length</span><br><span class="line">  <span class="keyword">val</span> subDirId = (hash / localDirs.length) % subDirsPerLocalDir</span><br><span class="line"></span><br><span class="line">  <span class="keyword">val</span> subDir = subDirs(dirId).synchronized &#123;</span><br><span class="line">    <span class="keyword">val</span> old = subDirs(dirId)(subDirId)</span><br><span class="line">    <span class="keyword">if</span> (old != <span class="literal">null</span>) &#123;</span><br><span class="line">      old</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      <span class="keyword">val</span> newDir = <span class="keyword">new</span> <span class="type">File</span>(localDirs(dirId), <span class="string">&quot;%02x&quot;</span>.format(subDirId))</span><br><span class="line">      <span class="keyword">if</span> (!newDir.exists()) &#123;</span><br><span class="line">        <span class="type">Files</span>.createDirectory(newDir.toPath)</span><br><span class="line">      &#125;</span><br><span class="line">      subDirs(dirId)(subDirId) = newDir</span><br><span class="line">      newDir</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">new</span> <span class="type">File</span>(subDir, filename)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ol>
+<li>根据 <code>block</code> 的命名取 hash</li>
+<li>hash 对父文件夹数量取余，确定父文件</li>
+<li>对父文件夹数量取商，再对子文件数量（默认 64）取余确定子文件</li>
+<li>如果文件已经存在则返回文件，如果不存在则创建子目录并格式化为两位的十六进制表示</li>
+</ol>
+<p>除了获取单个文件，还可以获取所有文件和块 id 的 <code>getAllFiles</code>、<code>getAllBlocks</code> 只是简单的遍历即可。</p>
+<p>创建临时文件</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">createTempLocalBlock</span></span>(): (<span class="type">TempLocalBlockId</span>, <span class="type">File</span>) = &#123;</span><br><span class="line">  <span class="keyword">var</span> blockId = <span class="keyword">new</span> <span class="type">TempLocalBlockId</span>(<span class="type">UUID</span>.randomUUID())</span><br><span class="line">  <span class="keyword">while</span> (getFile(blockId).exists()) &#123;</span><br><span class="line">    blockId = <span class="keyword">new</span> <span class="type">TempLocalBlockId</span>(<span class="type">UUID</span>.randomUUID())</span><br><span class="line">  &#125;</span><br><span class="line">  (blockId, getFile(blockId))</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">createTempShuffleBlock</span></span>(): (<span class="type">TempShuffleBlockId</span>, <span class="type">File</span>) = &#123;</span><br><span class="line">  <span class="keyword">var</span> blockId = <span class="keyword">new</span> <span class="type">TempShuffleBlockId</span>(<span class="type">UUID</span>.randomUUID())</span><br><span class="line">  <span class="keyword">while</span> (getFile(blockId).exists()) &#123;</span><br><span class="line">    blockId = <span class="keyword">new</span> <span class="type">TempShuffleBlockId</span>(<span class="type">UUID</span>.randomUUID())</span><br><span class="line">  &#125;</span><br><span class="line">  (blockId, getFile(blockId))</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这两个方法都很简单，用于创建 Spark 运行过程中的中间文件和 shuffle write 输出文件，分别用 <code>TempLocalBlockId</code> 和 <code>TempShuffleBlockId</code> 来表示。</p>
+<p>关闭钩子与关闭</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">addShutdownHook</span></span>(): <span class="type">AnyRef</span> = &#123;</span><br><span class="line">  </span><br><span class="line">  <span class="type">ShutdownHookManager</span>.addShutdownHook(<span class="type">ShutdownHookManager</span>.<span class="type">TEMP_DIR_SHUTDOWN_PRIORITY</span> + <span class="number">1</span>) &#123; () =&gt;</span><br><span class="line">   </span><br><span class="line">    <span class="type">DiskBlockManager</span>.<span class="keyword">this</span>.doStop()</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">doStop</span></span>(): <span class="type">Unit</span> = &#123;</span><br><span class="line">  <span class="keyword">if</span> (deleteFilesOnStop) &#123;</span><br><span class="line">    localDirs.foreach &#123; localDir =&gt;</span><br><span class="line">      <span class="keyword">if</span> (localDir.isDirectory() &amp;&amp; localDir.exists()) &#123;</span><br><span class="line">        <span class="keyword">if</span> (!<span class="type">ShutdownHookManager</span>.hasRootAsShutdownDeleteDir(localDir)) &#123;</span><br><span class="line">          <span class="type">Utils</span>.deleteRecursively(localDir)</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>如果 <code>deleteFilesOnStop</code> 构造方法参数为 true 则在关闭前会删除本地存储的文件和目录。</p>
+<p>与内存写入一样，磁盘写入也由 <code>DiskStore</code> 负责。先看下构造方法和属性</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[spark] <span class="class"><span class="keyword">class</span> <span class="title">DiskStore</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="class">    conf: <span class="type">SparkConf</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    diskManager: <span class="type">DiskBlockManager</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    securityManager: <span class="type">SecurityManager</span></span>) <span class="keyword">extends</span> <span class="title">Logging</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 实用内存映射（memroy map）读取文件最小阈值，由 spark.storage.memoryMapThreshold 参数控制，默认 2MB</span></span><br><span class="line">  <span class="comment">// 超过这个阈值时就不会直接读取，而是用内存映射的方式读取文件，以提高效率</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> minMemoryMapBytes = conf.get(config.<span class="type">STORAGE_MEMORY_MAP_THRESHOLD</span>)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 使用内存映射读取文件的最大阈值，由配置项spark.storage.memoryMapLimitForTests指定。它是个测试参数，默认值为不限制</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> maxMemoryMapBytes = conf.get(config.<span class="type">MEMORY_MAP_LIMIT_FOR_TESTS</span>)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 维护块与块大小之间的映射关系</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">val</span> blockSizes = <span class="keyword">new</span> <span class="type">ConcurrentHashMap</span>[<span class="type">BlockId</span>, <span class="type">Long</span>]()</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>写入块</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">put</span></span>(blockId: <span class="type">BlockId</span>)(writeFunc: <span class="type">WritableByteChannel</span> =&gt; <span class="type">Unit</span>): <span class="type">Unit</span> = &#123;</span><br><span class="line">  <span class="keyword">if</span> (contains(blockId)) &#123;</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> <span class="type">IllegalStateException</span>(<span class="string">s&quot;Block <span class="subst">$blockId</span> is already present in the disk store&quot;</span>)</span><br><span class="line">  &#125;</span><br><span class="line"> </span><br><span class="line">  <span class="keyword">val</span> startTimeNs = <span class="type">System</span>.nanoTime()</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 获取存储位置文件</span></span><br><span class="line">  <span class="keyword">val</span> file = diskManager.getFile(blockId)</span><br><span class="line">  <span class="keyword">val</span> out = <span class="keyword">new</span> <span class="type">CountingWritableChannel</span>(openForWrite(file))</span><br><span class="line">  <span class="keyword">var</span> threwException: <span class="type">Boolean</span> = <span class="literal">true</span></span><br><span class="line">  <span class="keyword">try</span> &#123;</span><br><span class="line">    writeFunc(out)</span><br><span class="line">    blockSizes.put(blockId, out.getCount)</span><br><span class="line">    threwException = <span class="literal">false</span></span><br><span class="line">  &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">      out.close()</span><br><span class="line">    &#125; <span class="keyword">catch</span> &#123;</span><br><span class="line">      <span class="keyword">case</span> ioe: <span class="type">IOException</span> =&gt;</span><br><span class="line">        <span class="keyword">if</span> (!threwException) &#123;</span><br><span class="line">          threwException = <span class="literal">true</span></span><br><span class="line">          <span class="keyword">throw</span> ioe</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">       <span class="keyword">if</span> (threwException) &#123;</span><br><span class="line">        remove(blockId)</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ol>
+<li>先判断这个块是否已经写入了 <code>contains</code> 方法会调用 <code>DiskBlockManager.getFile</code> 方法。</li>
+<li>调用 <code>DiskBlockManager.getFile()</code>方法打开块ID对应的文件</li>
+<li>获取该文件的 <code>WritableChannel</code>，（<code>CountingWritableChannel</code> 继承自 <code>WritableChannel</code>，添加了统计字节数功能），（NIO中的写通道，表示可以通过调用write()方法向文件写入数据）</li>
+<li>调用参数中传入的 <code>writeFunc</code> 函数进行写入</li>
+<li>将块大小更新到 <code>blockSizes</code> 中</li>
+</ol>
+<p>写入字节</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">putBytes</span></span>(blockId: <span class="type">BlockId</span>, bytes: <span class="type">ChunkedByteBuffer</span>): <span class="type">Unit</span> = &#123;</span><br><span class="line">  put(blockId) &#123; channel =&gt;</span><br><span class="line">    bytes.writeFully(channel)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>传入的参数除了块id 以外，还需要传入封装成 <code>ChunkedByteBuffer</code> 的对象，然后调用 put 方法，<code>writeFunc</code> 函数为 <code>ChunkedByteBuffer.writeFully</code>，负责将数据以一定的 Chunk 大小分块写入 <code>WritableByteChannel</code>。</p>
+<p>读取字节</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">getBytes</span></span>(blockId: <span class="type">BlockId</span>): <span class="type">BlockData</span> = &#123;</span><br><span class="line">  getBytes(diskManager.getFile(blockId.name), getSize(blockId))</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">getBytes</span></span>(f: <span class="type">File</span>, blockSize: <span class="type">Long</span>): <span class="type">BlockData</span> = securityManager.getIOEncryptionKey() <span class="keyword">match</span> &#123;</span><br><span class="line">  <span class="keyword">case</span> <span class="type">Some</span>(key) =&gt;</span><br><span class="line">    <span class="keyword">new</span> <span class="type">EncryptedBlockData</span>(f, blockSize, conf, key)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">case</span> _ =&gt;</span><br><span class="line">    <span class="keyword">new</span> <span class="type">DiskBlockData</span>(minMemoryMapBytes, maxMemoryMapBytes, f, blockSize)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在加密环境下和非加密环境下返回的结果是不同的，前者是 <code>EncryptedBlockData</code> 对象，后者是 <code>DiskBlockData</code> 对象，而它们都是 <code>BlockData</code> 的子类。顾名思义，<code>BlockData</code> 就是对磁盘块数据的具体封装，下面选择最常见的 <code>DiskBlockData</code> 来看一看。</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="class"><span class="keyword">class</span> <span class="title">DiskBlockData</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="class">    minMemoryMapBytes: <span class="type">Long</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    maxMemoryMapBytes: <span class="type">Long</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    file: <span class="type">File</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    blockSize: <span class="type">Long</span></span>) <span class="keyword">extends</span> <span class="title">BlockData</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">toInputStream</span></span>(): <span class="type">InputStream</span> = <span class="keyword">new</span> <span class="type">FileInputStream</span>(file)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">toNetty</span></span>(): <span class="type">AnyRef</span> = <span class="keyword">new</span> <span class="type">DefaultFileRegion</span>(file, <span class="number">0</span>, size)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">toChunkedByteBuffer</span></span>(allocator: (<span class="type">Int</span>) =&gt; <span class="type">ByteBuffer</span>): <span class="type">ChunkedByteBuffer</span> = &#123;</span><br><span class="line">    <span class="comment">// Utils.tryWithResource()方法实际上就是Java中try-with-resources的Scala实现，因为Scala中并没有这个语法糖。</span></span><br><span class="line">    <span class="type">Utils</span>.tryWithResource(open()) &#123; channel =&gt;</span><br><span class="line">      <span class="keyword">var</span> remaining = blockSize</span><br><span class="line">      <span class="keyword">val</span> chunks = <span class="keyword">new</span> <span class="type">ListBuffer</span>[<span class="type">ByteBuffer</span>]()</span><br><span class="line">      <span class="keyword">while</span> (remaining &gt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="keyword">val</span> chunkSize = math.min(remaining, maxMemoryMapBytes)</span><br><span class="line">        <span class="keyword">val</span> chunk = allocator(chunkSize.toInt)</span><br><span class="line">        remaining -= chunkSize</span><br><span class="line">        <span class="type">JavaUtils</span>.readFully(channel, chunk)</span><br><span class="line">        chunk.flip()</span><br><span class="line">        chunks += chunk</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">new</span> <span class="type">ChunkedByteBuffer</span>(chunks.toArray)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">toByteBuffer</span></span>(): <span class="type">ByteBuffer</span> = &#123;</span><br><span class="line">    <span class="type">Utils</span>.tryWithResource(open()) &#123; channel =&gt;</span><br><span class="line">      <span class="keyword">if</span> (blockSize &lt; minMemoryMapBytes) &#123;</span><br><span class="line">        <span class="keyword">val</span> buf = <span class="type">ByteBuffer</span>.allocate(blockSize.toInt)</span><br><span class="line">        <span class="type">JavaUtils</span>.readFully(channel, buf)</span><br><span class="line">        buf.flip()</span><br><span class="line">        buf</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        channel.map(<span class="type">MapMode</span>.<span class="type">READ_ONLY</span>, <span class="number">0</span>, file.length)</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">size</span></span>: <span class="type">Long</span> = blockSize</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">dispose</span></span>(): <span class="type">Unit</span> = &#123;&#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">open</span></span>() = <span class="keyword">new</span> <span class="type">FileInputStream</span>(file).getChannel</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>BlockData</code> 特征只是定义了块数据的转化方式，具体的细节则留给各个实现类。我们具体看看 <code>toChunkedByteBuffer()</code> 和 <code>toByteBuffer()</code> 这两个方法。<br><code>toChunkedByteBuffer()</code> 方法会将文件转化为输入流 <code>FileInputStream</code>，并获取其 <code>ReadableFileChannel</code>，再调用 <code>JavaUtils.readFully()</code> 方法将从 <code>Channel</code> 中取得的数据填充到 <code>ByteBuffer</code> 中。每个 <code>ByteBuffer</code> 即为一个 <code>Chunk</code>，所有 <code>Chunk</code> 的数组形成最终的 <code>ChunkedByteBuffer</code></p>
+<p><code>toByteBuffer()</code> 方法会检查块大小是否小于 <code>spark.storage.memoryMapThreshold</code>（终于出现了）。如果小于的话，就会采用与 <code>toChunkedByteBuffer()</code> 相同的方式直接填充 <code>ByteBuffer</code>。反之，就调用 <code>ReadableFileChannel.map()</code> 方法将数据映射到 <code>MappedByteBuffer</code> 中，即进程的虚拟内存中。不过，考虑到内存映射的应用场景的话，2MB的阈值可能有点小（保守）了</p>
+<p>参考<br><a target="_blank" rel="noopener" href="https://www.jianshu.com/p/7da741952ea5">Spark Core源码精读计划#27：磁盘块管理器DiskBlockManager</a><br><a target="_blank" rel="noopener" href="https://www.jianshu.com/p/b1cd632b5884">Spark Core源码精读计划#28：磁盘存储DiskStore</a></p>
+<p>待学习<br>ChunkedByteBuffer</p>
+
+    </div>
+     
+    <div class="post-footer__meta"><p>updated at 2022-03-04</p></div> 
+    <div class="post-entry__tags"><a href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="post-tags__link button"># 大数据</a><a href="/tags/Spark/" class="post-tags__link button"># Spark</a></div> 
+</article>
+
+
+    <div class="nav">
+        <div class="nav__prev">
+            
+                <a href="/2021/12/01/Spark%20%E5%AD%98%E5%82%A8%E7%B3%BB%E7%BB%9F5%E2%80%94MemoryStore/" class="nav__link">
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M589.088 790.624L310.464 512l278.624-278.624 45.248 45.248L400.96 512l233.376 233.376z" fill="#808080"></path></svg>
+                    </div>
+                    <div>
+                        <div class="nav__label">
+                            Previous Post
+                        </div>
+                        <div class="nav__title">
+                            Spark 存储系统5—MemoryStore
+                        </div>
+                    </div>
+                </a>
+            
+        </div>
+        <div class="nav__next">
+            
+                <a href="/2021/12/01/Spark%20%E5%AD%98%E5%82%A8%E7%B3%BB%E7%BB%9F7%E2%80%94BlockManager/" class="nav__link">
+                    <div>
+                        <div class="nav__label">
+                            Next Post
+                        </div>
+                        <div class="nav__title">
+                            Spark 存储系统7—BlockManager
+                        </div>
+                    </div>
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M434.944 790.624l-45.248-45.248L623.04 512l-233.376-233.376 45.248-45.248L713.568 512z" fill="#808080"></path></svg>
+                    </div>
+                </a>
+            
+        </div>
+    </div>
+
+
+
+    <div class="post__comments content-card" id="comment">
+        
+    <h4>Comments</h4>
+    
+    
+    
+    
+    
+    <div id="gitalk-container"></div>
+
+    
+    
+    
+    
+    
+    
+
+
+    </div>
+
+
+
+</main>
+
+            <footer class="footer">
+     
+    <a href="#" class="button" id="b2t" aria-label="Back to Top" title="Back to Top">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="32" height="32">
+            <path d="M233.376 722.752L278.624 768 512 534.624 745.376 768l45.248-45.248L512 444.128zM192 352h640V288H192z" fill="currentColor"></path>
+        </svg>
+    </a>
+
+    
+
+
+    
+    
+    
+        <span id="busuanzi_container_site_uv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_uv"></span>
+            <span>Viewers</span>
+            
+                <span>|</span>
+            
+        </span>
+    
+    
+        <span id="busuanzi_container_site_pv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_pv"></span>
+            <span>Views</span>
+            
+        </span>
+    
+ 
+ 
+
+ 
+    
+        
+        <p class="footer-copyright">
+            Copyright © 2022 <a href="/">大白</a>
+        </p>
+    
+    
+    <p>Powered by <a href="https://hexo.io" target="_blank">Hexo</a> | Theme - <a href="https://github.com/ChrAlpha/hexo-theme-cards" target="_blank">Cards</a></p>
+</footer>
+
+        </div>
+        
+    <script defer src="https://cdn.jsdelivr.net/npm/vanilla-lazyload@17.1.0/dist/lazyload.min.js"></script>
+    <script>
+        window.lazyLoadOptions = {
+            elements_selector: ".lazy",
+            threshold: 0
+        };
+    </script>
+ 
+
+ 
+    <script>
+        window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+        ga('create', 'UA-178473615-1', 'auto');
+        ga('send', 'pageview');
+    </script>
+    <script async src="https://www.google-analytics.com/analytics.js"></script>
+ 
+
+ 
+
+ 
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement('script');
+            hm.src = 'https://hm.baidu.com/hm.js?fb2dded415192023dd108d2b441862de';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+ 
+
+ 
+
+
+
+ 
+
+
+
+ 
+
+
+    
+ 
+
+
+    
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.4.1/dist/jquery.min.js"></script>
+
+    
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.css">
+
+    
+<script src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.js"></script>
+
+    <script>
+        let lazyloadT = Boolean('true'),
+            auto_fancybox = Boolean('true')
+        if (auto_fancybox) {
+            $(".post__content").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        } else {
+            $(".post__content").find("fancybox").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        }
+    </script>
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+    
+
+    
+    
+    
+
+    
+    
+    
+    <script>
+        function loadComment() {
+            let e, i;
+            (e = document.createElement("script")).src = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js',
+            document.body.appendChild(e);
+            e.onload = () => {
+                var gitalk = new Gitalk({
+                    clientID: '5343251f7191333c2cf8',
+                    clientSecret: 'c0471f2aaeafdec2f9ad0edfd4df7404db114101',
+                    repo: 'big-white-2020.github.io',
+                    owner: 'big-white-2020',
+                    admin: 'big-white-2020',
+                    id: window.location.pathname,
+                    distractionFreeMode: false
+                });
+                gitalk.render('gitalk-container');
+            };
+            (i = document.createElement("link")).rel = "stylesheet",
+            i.href = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css',
+            document.head.appendChild(i);
+        }
+    
+        var runningOnBrowser = typeof window !== "undefined";
+        var isBot = runningOnBrowser && !("onscroll" in window) || typeof navigator !== "undefined" && /(gle|ing|ro|msn)bot|crawl|spider|yand|duckgo/i.test(navigator.userAgent);
+        var supportsIntersectionObserver = runningOnBrowser && "IntersectionObserver" in window;
+    
+        setTimeout(function () {
+            if (!isBot && supportsIntersectionObserver) {
+                var comment_observer = new IntersectionObserver(function(entries) {
+                    if (entries[0].isIntersecting) {
+                        loadComment();
+                        comment_observer.disconnect();
+                    }
+                }, { threshold: [0] });
+                comment_observer.observe(document.getElementById('comment'));
+            } else {
+                loadComment();
+            }
+        }, 1);
+    </script>
+
+    
+    
+
+    
+    
+    
+    
+    
+
+    
+    
+    
+
+
+
+    </body>
+</html>

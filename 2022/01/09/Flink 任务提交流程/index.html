@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    <meta charset="utf-8">
+
+    
+
+    <!-- 渲染优化 -->
+    <meta name="renderer" content="webkit">
+    <meta name="force-rendering" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+    <meta name="HandheldFriendly" content="True" >
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+    <!--icon-->
+
+    
+    
+        <link rel="icon" type="image/png" sizes="16x16" href="/function%20small()%20%7B%20%5Bnative%20code%5D%20%7D">
+    
+    
+    
+    
+
+
+    <!-- meta -->
+
+
+<title>Flink-1.14 源码分析--任务提交流程 | 大白</title>
+
+
+    <meta name="keywords" content="Flink, 大数据, 源码分析">
+
+
+
+
+    <!-- OpenGraph -->
+ 
+    <meta name="description" content="Flink 任务提交的大体流程如下图所示，通过 CliFrontend 运行用户 Jar 中的 main 方法，再通过 PipelineExecutor 将任务提交到 Flink 集群  下面具体分析任务提交的代码。 通常我们使用 flink-dist&#x2F;src&#x2F;main&#x2F;flink-bin&#x2F;bin&#x2F;flink 脚本提交 Flink 任务，该脚本会运行 org.apache.flink.client">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Flink-1.14 源码分析--任务提交流程">
+<meta property="og:url" content="http://example.com/2022/01/09/Flink%20%E4%BB%BB%E5%8A%A1%E6%8F%90%E4%BA%A4%E6%B5%81%E7%A8%8B/index.html">
+<meta property="og:site_name" content="大白">
+<meta property="og:description" content="Flink 任务提交的大体流程如下图所示，通过 CliFrontend 运行用户 Jar 中的 main 方法，再通过 PipelineExecutor 将任务提交到 Flink 集群  下面具体分析任务提交的代码。 通常我们使用 flink-dist&#x2F;src&#x2F;main&#x2F;flink-bin&#x2F;bin&#x2F;flink 脚本提交 Flink 任务，该脚本会运行 org.apache.flink.client">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201081615829.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201081732353.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201081739845.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201081827082.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201092315425.png">
+<meta property="article:published_time" content="2022-01-09T03:45:09.000Z">
+<meta property="article:modified_time" content="2022-03-03T16:55:34.473Z">
+<meta property="article:author" content="yajun Li">
+<meta property="article:tag" content="Flink">
+<meta property="article:tag" content="大数据">
+<meta property="article:tag" content="源码分析">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201081615829.png">
+
+
+    
+<link rel="stylesheet" href="/css/style/main.css">
+ 
+
+    
+    
+        <link rel="stylesheet" id="hl-default-theme" href="/css/highlight/github.css" media="none" >
+        
+    
+
+    
+    
+
+    
+    
+<link rel="stylesheet" href="/css/style/dark.css">
+
+    
+<script src="/js/darkmode.js"></script>
+
+
+
+     
+    <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+ 
+
+    <!-- custom head -->
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+    <body>
+        <div id="app">
+            <header class="header">
+    <div class="header__left">
+        <a href="/" class="button">
+            <span class="logo__text">大白</span>
+        </a>
+    </div>
+    <div class="header__right">
+        
+            <div class="navbar__menus">
+                
+                    <a href="/" class="navbar-menu button">首页</a>
+                
+                    <a href="/tags/" class="navbar-menu button">标签</a>
+                
+                    <a href="/archives/" class="navbar-menu button">归档</a>
+                
+            </div>
+        
+        
+        
+    <a href="/search/" id="btn-search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="24" height="24" fill="currentColor" stroke="currentColor" stroke-width="32"><path d="M192 448c0-141.152 114.848-256 256-256s256 114.848 256 256-114.848 256-256 256-256-114.848-256-256z m710.624 409.376l-206.88-206.88A318.784 318.784 0 0 0 768 448c0-176.736-143.264-320-320-320S128 271.264 128 448s143.264 320 320 320a318.784 318.784 0 0 0 202.496-72.256l206.88 206.88 45.248-45.248z"></path></svg>
+    </a>
+
+
+        
+        
+    <a href="javaScript:void(0);" id="btn-toggle-dark">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </a>
+
+
+        
+            <a class="dropdown-icon button" id="btn-dropdown" tabindex="0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width='24' height='24' fill="none" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round"><path fill="currentColor" d="M3.314,4.8h13.372c0.41,0,0.743-0.333,0.743-0.743c0-0.41-0.333-0.743-0.743-0.743H3.314c-0.41,0-0.743,0.333-0.743,0.743C2.571,4.467,2.904,4.8,3.314,4.8z M16.686,15.2H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,15.2,16.686,15.2z M16.686,9.257H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,9.257,16.686,9.257z"></path></svg></a>
+            <div class="dropdown-menus" id="dropdown-menus">
+                
+                    <a href="/" class="dropdown-menu button">首页</a>
+                
+                    <a href="/tags/" class="dropdown-menu button">标签</a>
+                
+                    <a href="/archives/" class="dropdown-menu button">归档</a>
+                
+            </div>
+        
+    </div>
+</header>
+
+
+            <main class="main">
+    
+
+<div class="post-title">
+    <h1 class="post-title__text">
+        Flink-1.14 源码分析--任务提交流程
+    </h1>
+    <div class="post-title__meta">
+        <a href="/archives/2022/01/" class="post-meta__date button">2022-01-09</a>
+        
+ 
+        
+    
+     
+    <span id="busuanzi_container_page_pv" hidden>
+        <span class="separate-dot"></span>
+        <span></span>
+        <span id="busuanzi_value_page_pv"></span>
+        <span>Views</span>
+    </span>
+
+
+
+ 
+
+ 
+		| 本篇文章共<span class="post-count">2.5k字</span>，预计阅读<span class="post-count">10分钟</span>
+    </div>
+</div>
+
+
+
+<article class="post content-card">
+    <div class="post__header"></div>
+    <div class="post__content">
+        <p>Flink 任务提交的大体流程如下图所示，通过 CliFrontend 运行用户 Jar 中的 main 方法，再通过 PipelineExecutor 将任务提交到 Flink 集群</p>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201081615829.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201081615829.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220108161501160"></p>
+<p>下面具体分析任务提交的代码。</p>
+<p>通常我们使用 flink-dist/src/main/flink-bin/bin/flink 脚本提交 Flink 任务，该脚本会运行 org.apache.flink.client.cli.CliFrontend。在 CliFrontend 中根据不同的参数执行不同的 action，如运行任务、取消任务、停止任务、执行 savepoint 等等</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// do action</span></span><br><span class="line"><span class="keyword">switch</span> (action) &#123;</span><br><span class="line">    <span class="keyword">case</span> ACTION_RUN:</span><br><span class="line">        <span class="comment">// 运行任务</span></span><br><span class="line">        run(params);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">case</span> ACTION_RUN_APPLICATION:</span><br><span class="line">        runApplication(params);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">case</span> ACTION_LIST:</span><br><span class="line">        list(params);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">case</span> ACTION_INFO:</span><br><span class="line">        info(params);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">case</span> ACTION_CANCEL:</span><br><span class="line">        cancel(params);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">case</span> ACTION_STOP:</span><br><span class="line">        stop(params);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">case</span> ACTION_SAVEPOINT:</span><br><span class="line">        savepoint(params);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&quot;-h&quot;</span>:</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&quot;--help&quot;</span>:</span><br><span class="line">        CliFrontendParser.printHelp(customCommandLines);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&quot;-v&quot;</span>:</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&quot;--version&quot;</span>:</span><br><span class="line">        String version = EnvironmentInformation.getVersion();</span><br><span class="line">        String commitID = EnvironmentInformation.getRevisionInformation().commitId;</span><br><span class="line">        System.out.print(<span class="string">&quot;Version: &quot;</span> + version);</span><br><span class="line">        System.out.println(</span><br><span class="line">            commitID.equals(EnvironmentInformation.UNKNOWN)</span><br><span class="line">            ? <span class="string">&quot;&quot;</span></span><br><span class="line">            : <span class="string">&quot;, Commit ID: &quot;</span> + commitID);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>重点看下运行任务，即 run() 方法。在 run() 方法中会进行任务提交参数校验，获取任务依赖的 jar 包，将应用 Jar 包封装成 PackageProgram 对象，这个对象会加载提交参数中的主类。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// org.apache.flink.client.cli.CliFrontend#run</span></span><br><span class="line"><span class="comment">// 已删减部分代码</span></span><br><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">final</span> Options commandOptions = CliFrontendParser.getRunCommandOptions();</span><br><span class="line">    <span class="keyword">final</span> CommandLine commandLine = getCommandLine(commandOptions, args, <span class="keyword">true</span>);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 校验参数</span></span><br><span class="line">    <span class="keyword">final</span> CustomCommandLine activeCommandLine =</span><br><span class="line">        validateAndGetActiveCommandLine(checkNotNull(commandLine));</span><br><span class="line"></span><br><span class="line">    <span class="keyword">final</span> ProgramOptions programOptions = ProgramOptions.create(commandLine);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 获取依赖 Jar 包</span></span><br><span class="line">    <span class="keyword">final</span> List&lt;URL&gt; jobJars = getJobJarAndDependencies(programOptions);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 封装参数为配置类</span></span><br><span class="line">    <span class="keyword">final</span> Configuration effectiveConfiguration =</span><br><span class="line">        getEffectiveConfiguration(activeCommandLine, commandLine, programOptions, jobJars);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 将用户 Jar 文件封装为 PackagedProgram 对象</span></span><br><span class="line">    <span class="keyword">try</span> (PackagedProgram program = getPackagedProgram(programOptions, effectiveConfiguration)) &#123;</span><br><span class="line">        <span class="comment">// 执行 main class 中的 main 方法</span></span><br><span class="line">        executeProgram(effectiveConfiguration, program);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>通过 executeProgram() 方法，最后会通过 org.apache.flink.client.ClientUtils#executeProgram 调用 PackagedProgram 对象的 invokeInteractiveModeForExecution() 方法调用我们编写任务的 main 方法。至此 CliFrontend 的使命就完成了，将接力棒交到了 custom main 手中。</p>
+<p>我们以 org.apache.flink.streaming.examples.wordcount.WordCount 官方示例为例，我们一般编写流任务第一步都需要获取 StreamExecutionEnvironment，最后再调用 StreamExecutionEnvironment() 方法触发任务执行</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// org.apache.flink.streaming.examples.wordcount.WordCount#main</span></span><br><span class="line"><span class="comment">// 已删减修改代码</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Checking input parameters</span></span><br><span class="line">    <span class="keyword">final</span> MultipleParameterTool params = MultipleParameterTool.fromArgs(args);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// set up the execution environment</span></span><br><span class="line">    <span class="keyword">final</span> StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();</span><br><span class="line"></span><br><span class="line">    <span class="comment">// make parameters available in the web interface</span></span><br><span class="line">    env.getConfig().setGlobalJobParameters(params);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// get input data</span></span><br><span class="line">    DataStream&lt;String&gt; text =  env.fromElements(WordCountData.WORDS);</span><br><span class="line"></span><br><span class="line">    DataStream&lt;Tuple2&lt;String, Integer&gt;&gt; counts =</span><br><span class="line">        <span class="comment">// split up the lines in pairs (2-tuples) containing: (word,1)</span></span><br><span class="line">        text.flatMap(<span class="keyword">new</span> Tokenizer())</span><br><span class="line">        <span class="comment">// group by the tuple field &quot;0&quot; and sum up tuple field &quot;1&quot;</span></span><br><span class="line">        .keyBy(value -&gt; value.f0)</span><br><span class="line">        .sum(<span class="number">1</span>);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// execute program</span></span><br><span class="line">    env.execute(<span class="string">&quot;Streaming WordCount&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>既然任务是以 env.execute() 方法触发，那就将 execute() 作为入口，看看后续的逻辑。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 以下代码已删减</span></span><br><span class="line"><span class="comment">// org.apache.flink.streaming.api.environment.StreamExecutionEnvironment#execute(java.lang.String)</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> JobExecutionResult <span class="title">execute</span><span class="params">(String jobName)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 获取 StreamGraph</span></span><br><span class="line">    <span class="keyword">final</span> StreamGraph streamGraph = getStreamGraph();</span><br><span class="line">    streamGraph.setJobName(jobName);</span><br><span class="line">    <span class="keyword">return</span> execute(streamGraph);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// org.apache.flink.streaming.api.environment.StreamExecutionEnvironment#execute(org.apache.flink.streaming.api.graph.StreamGraph)</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> JobExecutionResult <span class="title">execute</span><span class="params">(StreamGraph streamGraph)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">final</span> JobClient jobClient = executeAsync(streamGraph);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">final</span> JobExecutionResult jobExecutionResult;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (configuration.getBoolean(DeploymentOptions.ATTACHED)) &#123;</span><br><span class="line">        jobExecutionResult = jobClient.getJobExecutionResult().get();</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        jobExecutionResult = <span class="keyword">new</span> DetachedJobExecutionResult(jobClient.getJobID());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    jobListeners.forEach(</span><br><span class="line">        jobListener -&gt; jobListener.onJobExecuted(jobExecutionResult, <span class="keyword">null</span>));</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> jobExecutionResult;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>上面代码分为两部分，第一 execute() 方法会获取一个 StreamGraph 对象（StreamGraph 这部分后面会单独写一篇，现在只需要将它视为一个 “符号引用”，表示我们编写代码的逻辑即可）；第二个 execute() 方法接上面获取的 StreamGraph 对象作为参数，再调用 executeAsync() 方法就返回了一个 JobClient 对象，然后通过 JobClient 对象获取任务的执行结果。显然，executeAsync() 就是任务提交执行的重点，but，在介绍 executeAsync() 方法前，我们先看下获取任务执行结果的两个分支。</p>
+<p>从变量名上可以看出部署分为 Attached 和 Detached 两种模式，即我们提交任务后 Client 是否可以退出。Detached 模式下，Client 在提交完任务后就可以退出了，任务运行在 Flink 集群上不需要管了；而 Attached 则在 Client 提交任务后不能够退出，即不能关闭命令行窗口，需要继续与 Flink 集群保持连接，能够实时看到集群任务的一些运行日志和运行结束状态等等。</p>
+<p>ok，插播完毕，继续来看看 executeAsync() 方法，从方法名上就能看出来任务是异步提交的，废话少说，上代码</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// org.apache.flink.streaming.api.environment.StreamExecutionEnvironment#executeAsync(org.apache.flink.streaming.api.graph.StreamGraph)</span></span><br><span class="line"><span class="comment">// 代码已删减</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> JobClient <span class="title">executeAsync</span><span class="params">(StreamGraph streamGraph)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 获取一个 PipelineExecutorFactory，通过 SPI 的方式</span></span><br><span class="line">    <span class="keyword">final</span> PipelineExecutorFactory executorFactory =</span><br><span class="line">        executorServiceLoader.getExecutorFactory(configuration);</span><br><span class="line"></span><br><span class="line">    CompletableFuture&lt;JobClient&gt; jobClientFuture =</span><br><span class="line">        executorFactory</span><br><span class="line">        .getExecutor(configuration)</span><br><span class="line">        .execute(streamGraph, configuration, userClassloader);</span><br><span class="line"></span><br><span class="line">    JobClient jobClient = jobClientFuture.get();</span><br><span class="line">    jobListeners.forEach(jobListener -&gt; jobListener.onJobSubmitted(jobClient, <span class="keyword">null</span>));</span><br><span class="line">    <span class="keyword">return</span> jobClient;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>诶！上面代码出现了 PipelineExecutorFactory 跟开局第一张图中的 PipelineExecutor 有点像，没错，就是 PipelineExecutor 的工厂类，是通过 SPI 的方式，不同类型的集群以插件的方式实现，方便以后扩展，通过任务提交时的参数进行匹配，如果没有配上一个或者匹配多个，都会抛出异常。PipelineExecutorFactory 会获取一个 PipelineExecutor 对象，再执行其 execute() 方法。下面插播一下 PipelineExecutor。</p>
+<p>代码里关于 PipelineExcutor 的注释为 <code>The entity responsible for executing a Pipeline, i.e. a user job.</code>  负责执行 Pipeline 的实体，比如一个用户任务。</p>
+<p>首先解释下 Pipeline，从我们编写的代码来理解，我们 <code>text.flatMap(new Tokenizer()).keyBy(value -&gt; value.f0).sum(1);</code> 从输入一直点点点调用一些函数，然后这些函数对数据进行处理，是不是有点像我们的工厂流水线？这里先这么理解，后续关于 StreamGraph 时再详细解释。Pipeline 是一个接口，有两个实现 Plan 和 StreamGraph 分别表示批处理和流处理。</p>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201081732353.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201081732353.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220108173242261"></p>
+<p>现在再来看 PipelineExecutor，PipelineExecutor 也是一个接口，有很多的实现 AbstractJobClusterExecutor、AbstractSessionClusterExecutor、LocalExecutor、EmbededExecutor</p>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201081739845.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201081739845.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220108173903794"></p>
+<p>PipelineExecutor 是将我们的 Flink Job 提交给 Flink 集群的重要环节。Flink 集群有两种模式 Session、Per-Job 模式，这两种模式的集群启动时间、提交作业的方式都不太一样，所以上面类图中有两种 Executor，AbstractSeesionClusterExecutor、AbstracJobClusterExecutor 分别对应 Session 和 Per-Job 模式。</p>
+<p>出了两种集群模式外还有一个 LocalExecutor，会在我们本地测试时运行 Flink MiniCluster 时用到。而剩下的 EmbeddedExecutor 则是一个内嵌直接调用 Dispatcher 的 Executor，而不是通过 REST API 调用。这是说了直接调用而不是使用 REST API 调用，那肯定有些 executor 是通过 REST API 调用了，没错就是 Session 模式下的 AbstractSessionClusterExecutor。下面分别聊聊 Session 模式和 Per-Job 模式任务提交的异同</p>
+<ol>
+<li><p>Session 模式</p>
+<p> Session 模式下，提前启动一个 Flink 集群，所有作业共享同一个集群的资源，作业通过 HTTP 协议提交</p>
+<p> AbstractSeesionClusterExecutor 有三个子类，KubernetesSessionClusterExecutor、YarnSeesionClusterExecutor、RemoteExecutor，很明显 Flink 集群的 Session 模式支持 k8s 和 yarn，而 RemoteExecutor 表示 Standalone。前两者都是弹性可伸缩的，而 Standalone 比较特殊，在机器上直接部署 Flink，那么就已经启动了一个集群，天生就是 Session 模式且不支持 Per-Job 模式。</p>
+<p> Session 模式下，任务提交通过 yarn-session.sh 脚本，k8s 则通过 kubernetes-session.sh 提交，两者逻辑基本相同。都是在提交任务前会先检查是否已经存在已经启动的 Flink Session 集群，如果没有则先启动一个 Flink Session 集群，然后在 PipelineExecutor 中通过 ResetClusterClient 向 Dispatcher 提交任务，然后 Dispatcher 为这个任务启动一个 JobMaster，进入作业执行阶段。具体代码逻辑就不贴了，有兴趣的朋友可以自行去看下。下面给一张图作为参考</p>
+<p> <img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201081827082.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201081827082.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220108182736002"></p>
+</li>
+<li><p>Per-Job 模式</p>
+<p> 目前只有 Yarn 集群支持 Per-Job 模式，在 Per-Job 模式中，不会共享 Flink 集群，每次提交一个任务都会单独启动一个 Flink 集群，我们来分析下 AbstractJobClusterExecutor</p>
+ <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// org.apache.flink.client.deployment.executors.AbstractJobClusterExecutor#execute</span></span><br><span class="line"><span class="comment">// 代码已删减</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> CompletableFuture&lt;JobClient&gt; <span class="title">execute</span><span class="params">(</span></span></span><br><span class="line"><span class="params"><span class="function">    <span class="meta">@Nonnull</span> <span class="keyword">final</span> Pipeline pipeline,</span></span></span><br><span class="line"><span class="params"><span class="function">    <span class="meta">@Nonnull</span> <span class="keyword">final</span> Configuration configuration,</span></span></span><br><span class="line"><span class="params"><span class="function">    <span class="meta">@Nonnull</span> <span class="keyword">final</span> ClassLoader userCodeClassloader)</span></span></span><br><span class="line"><span class="function">    <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line">    <span class="comment">// 获取 JobGraph</span></span><br><span class="line">    <span class="keyword">final</span> JobGraph jobGraph = PipelineExecutorUtils.getJobGraph(pipeline, configuration);</span><br><span class="line"></span><br><span class="line">	<span class="comment">// 获取 Cluster Descriptor</span></span><br><span class="line">    <span class="keyword">try</span> (<span class="keyword">final</span> ClusterDescriptor&lt;ClusterID&gt; clusterDescriptor =</span><br><span class="line">         clusterClientFactory.createClusterDescriptor(configuration)) &#123;</span><br><span class="line">        <span class="keyword">final</span> ExecutionConfigAccessor configAccessor =</span><br><span class="line">            ExecutionConfigAccessor.fromConfiguration(configuration);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> ClusterSpecification clusterSpecification =</span><br><span class="line">            clusterClientFactory.getClusterSpecification(configuration);</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 提交任务到 Yarn</span></span><br><span class="line">        <span class="keyword">final</span> ClusterClientProvider&lt;ClusterID&gt; clusterClientProvider =</span><br><span class="line">            clusterDescriptor.deployJobCluster(</span><br><span class="line">            clusterSpecification, jobGraph, configAccessor.getDetachedMode());</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> CompletableFuture.completedFuture(</span><br><span class="line">            <span class="keyword">new</span> ClusterClientJobClientAdapter&lt;&gt;(</span><br><span class="line">                clusterClientProvider, jobGraph.getJobID(), userCodeClassloader));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p> 上面流程中，先获取 JobGraph 将之前的 StreamGraph 转换成 JobGraph，然后获取一个 ClusterDescriptor 集群描述符，是部署群集(例如Yarn)并返回用于群集通信的客户端的描述符。最后通过 ClusterDescriptor.deployJobCluster() 部署任务到集群中。</p>
+<p> 很明显 ClusterDescriptor 一定是一个接口或者抽象类，针对不同的集群有不同的实现方式。后续代码就不贴了，无非就是检查配置信息，Yarn 集群信息，然后再将一些必要的文件如 Jar 包、log 配置文件、flink 配置文件上传到 HDFS，然后再通过 YarnClient 提交启动一个 Application。有兴趣的朋友可以自行去看下代码，代码在 org.apache.flink.yarn.YarnClusterDescriptor#startAppMaster。最后再贴一下 Per-Job 的提交流程图，关于任务提交到 Yarn 之后的部分会在以后的资源管理和作业调度中再详细分析。</p>
+<p> <img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201092315425.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201092315425.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220109231517328"></p>
+<p> 最后再提一下通过 <code>./bin/flink run</code> 是 Per-Job 方式提交，在 Client 端生成 JobGraph；如果通过 <code>./bin/flink run-application</code> 通过这个命令提交参数，则以 application 方式提交，区别是我们编写的 main() 方法将在 JobManager 上运行，也就是说会在 JobManager 上生成 JobGraph。</p>
+</li>
+</ol>
+<p>总结：</p>
+<p>本文分析了 Flink 作业提交时在 Client 端的流转流程，分析了一个作业时如何提交到 Flink 集群中的，并分析了 Session 模式与 Per-Job 模式的异同。在 Client 端，CliFrontend 是作业提交的入口，该类会通过反射的方式运行我们编写的类中的 main() 方法，之后在 StreamExecuteEnvironment 中会生成 JobGraph，最后再将 JobGraph 提交到集群中运行。</p>
+
+    </div>
+     
+    <div class="post-footer__meta"><p>updated at 2022-03-04</p></div> 
+    <div class="post-entry__tags"><a href="/tags/Flink/" class="post-tags__link button"># Flink</a><a href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="post-tags__link button"># 大数据</a><a href="/tags/%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/" class="post-tags__link button"># 源码分析</a></div> 
+</article>
+
+
+    <div class="nav">
+        <div class="nav__prev">
+            
+                <a href="/2022/01/11/Flink%20StreamGraph%20%E7%94%9F%E6%88%90%E8%BF%87%E7%A8%8B%E5%89%8D%E7%BD%AE%E7%AF%87/" class="nav__link">
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M589.088 790.624L310.464 512l278.624-278.624 45.248 45.248L400.96 512l233.376 233.376z" fill="#808080"></path></svg>
+                    </div>
+                    <div>
+                        <div class="nav__label">
+                            Previous Post
+                        </div>
+                        <div class="nav__title">
+                            Flink-1.14 源码分析--StreamGraph 生成过程前置篇
+                        </div>
+                    </div>
+                </a>
+            
+        </div>
+        <div class="nav__next">
+            
+                <a href="/2021/12/08/SparkSQL/" class="nav__link">
+                    <div>
+                        <div class="nav__label">
+                            Next Post
+                        </div>
+                        <div class="nav__title">
+                            SparkSQL
+                        </div>
+                    </div>
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M434.944 790.624l-45.248-45.248L623.04 512l-233.376-233.376 45.248-45.248L713.568 512z" fill="#808080"></path></svg>
+                    </div>
+                </a>
+            
+        </div>
+    </div>
+
+
+
+    <div class="post__comments content-card" id="comment">
+        
+    <h4>Comments</h4>
+    
+    
+    
+    
+    
+    <div id="gitalk-container"></div>
+
+    
+    
+    
+    
+    
+    
+
+
+    </div>
+
+
+
+</main>
+
+            <footer class="footer">
+     
+    <a href="#" class="button" id="b2t" aria-label="Back to Top" title="Back to Top">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="32" height="32">
+            <path d="M233.376 722.752L278.624 768 512 534.624 745.376 768l45.248-45.248L512 444.128zM192 352h640V288H192z" fill="currentColor"></path>
+        </svg>
+    </a>
+
+    
+
+
+    
+    
+    
+        <span id="busuanzi_container_site_uv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_uv"></span>
+            <span>Viewers</span>
+            
+                <span>|</span>
+            
+        </span>
+    
+    
+        <span id="busuanzi_container_site_pv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_pv"></span>
+            <span>Views</span>
+            
+        </span>
+    
+ 
+ 
+
+ 
+    
+        
+        <p class="footer-copyright">
+            Copyright © 2022 <a href="/">大白</a>
+        </p>
+    
+    
+    <p>Powered by <a href="https://hexo.io" target="_blank">Hexo</a> | Theme - <a href="https://github.com/ChrAlpha/hexo-theme-cards" target="_blank">Cards</a></p>
+</footer>
+
+        </div>
+        
+    <script defer src="https://cdn.jsdelivr.net/npm/vanilla-lazyload@17.1.0/dist/lazyload.min.js"></script>
+    <script>
+        window.lazyLoadOptions = {
+            elements_selector: ".lazy",
+            threshold: 0
+        };
+    </script>
+ 
+
+ 
+    <script>
+        window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+        ga('create', 'UA-178473615-1', 'auto');
+        ga('send', 'pageview');
+    </script>
+    <script async src="https://www.google-analytics.com/analytics.js"></script>
+ 
+
+ 
+
+ 
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement('script');
+            hm.src = 'https://hm.baidu.com/hm.js?fb2dded415192023dd108d2b441862de';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+ 
+
+ 
+
+
+
+ 
+
+
+
+ 
+
+
+    
+ 
+
+
+    
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.4.1/dist/jquery.min.js"></script>
+
+    
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.css">
+
+    
+<script src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.js"></script>
+
+    <script>
+        let lazyloadT = Boolean('true'),
+            auto_fancybox = Boolean('true')
+        if (auto_fancybox) {
+            $(".post__content").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        } else {
+            $(".post__content").find("fancybox").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        }
+    </script>
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+    
+
+    
+    
+    
+
+    
+    
+    
+    <script>
+        function loadComment() {
+            let e, i;
+            (e = document.createElement("script")).src = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js',
+            document.body.appendChild(e);
+            e.onload = () => {
+                var gitalk = new Gitalk({
+                    clientID: '5343251f7191333c2cf8',
+                    clientSecret: 'c0471f2aaeafdec2f9ad0edfd4df7404db114101',
+                    repo: 'big-white-2020.github.io',
+                    owner: 'big-white-2020',
+                    admin: 'big-white-2020',
+                    id: window.location.pathname,
+                    distractionFreeMode: false
+                });
+                gitalk.render('gitalk-container');
+            };
+            (i = document.createElement("link")).rel = "stylesheet",
+            i.href = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css',
+            document.head.appendChild(i);
+        }
+    
+        var runningOnBrowser = typeof window !== "undefined";
+        var isBot = runningOnBrowser && !("onscroll" in window) || typeof navigator !== "undefined" && /(gle|ing|ro|msn)bot|crawl|spider|yand|duckgo/i.test(navigator.userAgent);
+        var supportsIntersectionObserver = runningOnBrowser && "IntersectionObserver" in window;
+    
+        setTimeout(function () {
+            if (!isBot && supportsIntersectionObserver) {
+                var comment_observer = new IntersectionObserver(function(entries) {
+                    if (entries[0].isIntersecting) {
+                        loadComment();
+                        comment_observer.disconnect();
+                    }
+                }, { threshold: [0] });
+                comment_observer.observe(document.getElementById('comment'));
+            } else {
+                loadComment();
+            }
+        }, 1);
+    </script>
+
+    
+    
+
+    
+    
+    
+    
+    
+
+    
+    
+    
+
+
+
+    </body>
+</html>

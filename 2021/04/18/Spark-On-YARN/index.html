@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    <meta charset="utf-8">
+
+    
+
+    <!-- 渲染优化 -->
+    <meta name="renderer" content="webkit">
+    <meta name="force-rendering" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+    <meta name="HandheldFriendly" content="True" >
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+    <!--icon-->
+
+    
+    
+        <link rel="icon" type="image/png" sizes="16x16" href="/function%20small()%20%7B%20%5Bnative%20code%5D%20%7D">
+    
+    
+    
+    
+
+
+    <!-- meta -->
+
+
+<title>Spark on YARN | 大白</title>
+
+
+    <meta name="keywords" content="大数据, Spark, YARN">
+
+
+
+
+    <!-- OpenGraph -->
+ 
+    <meta name="description" content="YARN  YARN(Yet Another Resource Negotiator) 是 Hadoop 2.x 新增的资源调度器。首先看下 Hadoop 1.x 是怎么调度的   Hadoop 1.x 的运行流程：  client 提交任务给 Job Tracker Job Tracker 接收任务，并根据 Job 的参数向 NameNode 请求包含这些文件的 DataNode 节点列表 J">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark on YARN">
+<meta property="og:url" content="http://example.com/2021/04/18/Spark-On-YARN/index.html">
+<meta property="og:site_name" content="大白">
+<meta property="og:description" content="YARN  YARN(Yet Another Resource Negotiator) 是 Hadoop 2.x 新增的资源调度器。首先看下 Hadoop 1.x 是怎么调度的   Hadoop 1.x 的运行流程：  client 提交任务给 Job Tracker Job Tracker 接收任务，并根据 Job 的参数向 NameNode 请求包含这些文件的 DataNode 节点列表 J">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418141945">
+<meta property="og:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418142709.gif">
+<meta property="og:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418144121.jpg">
+<meta property="og:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418150911">
+<meta property="og:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418161432.jpeg">
+<meta property="og:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418170340">
+<meta property="article:published_time" content="2021-04-18T08:30:09.000Z">
+<meta property="article:modified_time" content="2022-03-03T16:55:34.473Z">
+<meta property="article:author" content="yajun Li">
+<meta property="article:tag" content="大数据">
+<meta property="article:tag" content="Spark">
+<meta property="article:tag" content="YARN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418141945">
+
+
+    
+<link rel="stylesheet" href="/css/style/main.css">
+ 
+
+    
+    
+        <link rel="stylesheet" id="hl-default-theme" href="/css/highlight/github.css" media="none" >
+        
+    
+
+    
+    
+
+    
+    
+<link rel="stylesheet" href="/css/style/dark.css">
+
+    
+<script src="/js/darkmode.js"></script>
+
+
+
+     
+    <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+ 
+
+    <!-- custom head -->
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+    <body>
+        <div id="app">
+            <header class="header">
+    <div class="header__left">
+        <a href="/" class="button">
+            <span class="logo__text">大白</span>
+        </a>
+    </div>
+    <div class="header__right">
+        
+            <div class="navbar__menus">
+                
+                    <a href="/" class="navbar-menu button">首页</a>
+                
+                    <a href="/tags/" class="navbar-menu button">标签</a>
+                
+                    <a href="/archives/" class="navbar-menu button">归档</a>
+                
+            </div>
+        
+        
+        
+    <a href="/search/" id="btn-search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="24" height="24" fill="currentColor" stroke="currentColor" stroke-width="32"><path d="M192 448c0-141.152 114.848-256 256-256s256 114.848 256 256-114.848 256-256 256-256-114.848-256-256z m710.624 409.376l-206.88-206.88A318.784 318.784 0 0 0 768 448c0-176.736-143.264-320-320-320S128 271.264 128 448s143.264 320 320 320a318.784 318.784 0 0 0 202.496-72.256l206.88 206.88 45.248-45.248z"></path></svg>
+    </a>
+
+
+        
+        
+    <a href="javaScript:void(0);" id="btn-toggle-dark">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </a>
+
+
+        
+            <a class="dropdown-icon button" id="btn-dropdown" tabindex="0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width='24' height='24' fill="none" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round"><path fill="currentColor" d="M3.314,4.8h13.372c0.41,0,0.743-0.333,0.743-0.743c0-0.41-0.333-0.743-0.743-0.743H3.314c-0.41,0-0.743,0.333-0.743,0.743C2.571,4.467,2.904,4.8,3.314,4.8z M16.686,15.2H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,15.2,16.686,15.2z M16.686,9.257H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,9.257,16.686,9.257z"></path></svg></a>
+            <div class="dropdown-menus" id="dropdown-menus">
+                
+                    <a href="/" class="dropdown-menu button">首页</a>
+                
+                    <a href="/tags/" class="dropdown-menu button">标签</a>
+                
+                    <a href="/archives/" class="dropdown-menu button">归档</a>
+                
+            </div>
+        
+    </div>
+</header>
+
+
+            <main class="main">
+    
+
+<div class="post-title">
+    <h1 class="post-title__text">
+        Spark on YARN
+    </h1>
+    <div class="post-title__meta">
+        <a href="/archives/2021/04/" class="post-meta__date button">2021-04-18</a>
+        
+ 
+        
+    
+     
+    <span id="busuanzi_container_page_pv" hidden>
+        <span class="separate-dot"></span>
+        <span></span>
+        <span id="busuanzi_value_page_pv"></span>
+        <span>Views</span>
+    </span>
+
+
+
+ 
+
+ 
+		| 本篇文章共<span class="post-count">1.5k字</span>，预计阅读<span class="post-count">5分钟</span>
+    </div>
+</div>
+
+
+
+<article class="post content-card">
+    <div class="post__header"></div>
+    <div class="post__content">
+        <ol>
+<li><p>YARN</p>
+<p> YARN(Yet Another Resource Negotiator) 是 Hadoop 2.x 新增的资源调度器。首先看下 Hadoop 1.x 是怎么调度的<br> <img src="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418141945" class="lazy" data-srcset="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418141945" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="图片"></p>
+<p> Hadoop 1.x 的运行流程：</p>
+<ol>
+<li>client 提交任务给 <code>Job Tracker</code></li>
+<li><code>Job Tracker</code> 接收任务，并根据 Job 的参数向 <code>NameNode</code> 请求包含这些文件的 <code>DataNode</code> 节点列表</li>
+<li><code>Job Tracker</code> 确定执行计划：确认 <code>Map</code>、<code>Reduce</code> 的 Task 数量，将这些 Task 分配到离数据块最近的节点上执行</li>
+</ol>
+<p> 随着发展部署任务越来越多，虽然 <code>Job Tracker</code> 可以部署多个，但是只有一个 <code>Job Tracker</code> 处于 active 状态，其它的 <code>Job Tracker</code> 都是 standby 并不能接收任务，所以 <code>Job Tracker</code> 变成了 Hadoop 的瓶颈。</p>
+<p> 那么 YARN 是怎么解决这个问题的呢？YARN 采用 Master/Slave 的结构，采用双层调度架构，第一层是 <code>ResourceManager</code> 和 <code>NodeManager</code> : <code>ResourceManager</code> 是 Master 节点，相当于 <code>Job Tracker</code>，有 <code>Scheduler</code> 和 <code>Application Manager</code> 两个组件，分别用于资源调度和应用管理；<code>NodeManager</code> 是 Slave 节点，可以部署在独立的机器上，用于管理及其上的资源。</p>
+<p> 第二层是 <code>NodeManager</code> 和 <code>Container</code> ，<code>NodeManager</code> 将 CPU 内存等资源抽象成一个个的 <code>Container</code> 并管理它们的生命周期。</p>
+<p> 这种架构的好处：</p>
+<ul>
+<li><p><code>Scheduler</code> 由原来管理的 CPU 等资源变成了管理 <code>Container</code> 粒度变粗了，降低了负载。</p>
+</li>
+<li><p><code>Application Manager</code> 只需要管理 <code>App Master</code> 不需要管理任务调度的完整信息，也降低了负载。</p>
+</li>
+</ul>
+<p> 下图为 YARN 的架构图<br> <img src="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418142709.gif" class="lazy" data-srcset="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418142709.gif" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="Yarn架构图"></p>
+<p> 组件说明：</p>
+<ul>
+<li><p>ResourceManager：</p>
+<ul>
+<li>定时调度器(Scheduler)：从本质上来说，定时调度器就是一种策略，或者说一种算法。当 Client 提交一个任务的时候，它会根据所需要的资源以及当前集群的资源状况进行分配。注意，它只负责向应用程序分配资源，并不做监控以及应用程序的状态跟踪。</li>
+<li>应用管理器(ApplicationManager)：同样，听名字就能大概知道它是干嘛的。应用管理器就是负责管理 Client 用户提交的应用。上面不是说到定时调度器（Scheduler）不对用户提交的程序监控嘛，其实啊，监控应用的工作正是由应用管理器（ApplicationManager）完成的。</li>
+</ul>
+</li>
+<li><p>NodeManager:</p>
+<ul>
+<li><p>Container：容器（Container）这个东西是 Yarn 对资源做的一层抽象。就像我们平时开发过程中，经常需要对底层一些东西进行封装，只提供给上层一个调用接口一样，Yarn 对资源的管理也是用到了这种思想。<br><img src="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418144121.jpg" class="lazy" data-srcset="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418144121.jpg" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="container"><br>  需要注意两点：</p>
+<ol>
+<li>容器由 NodeManager 启动和管理，并被它所监控。</li>
+<li>容器被 ResourceManager 进行调度。</li>
+</ol>
+</li>
+</ul>
+</li>
+<li><p>ApplicationMaster</p>
+<p>  每当 Client 提交一个 Application 时候，就会新建一个 <code>ApplicationMaster</code> 。由这个 <code>ApplicationMaster</code> 去与 <code>ResourceManager</code> 申请容器资源，获得资源后会将要运行的程序发送到容器上启动，然后进行分布式计算。这个 <code>ApplicationMaster</code> 可能运行在某个 <code>Container</code> 中，也可能运行在 Clinet 中，由不同的部署方式决定。</p>
+</li>
+</ul>
+<p> YARN 的部署流程：</p>
+<ol>
+<li>Client 向 <code>ResourceManager</code> 提交一个作业。</li>
+<li><code>ResourceManager</code> 向 <code>NodeManager</code> 请求一个 <code>Container</code> 并在这个 <code>Container</code> 中运行 <code>ApplicationMaster</code></li>
+<li><code>ApplicationMaster</code> 向 <code>ResourceManager</code> 注册，注册之后，客户端就可以查询 <code>ResourceManager</code> 获得自己 <code>ApplicationMaster</code> 的详情以及直接和 <code>ApplicationMaster</code> 交互；</li>
+<li><code>ApplicationMaster</code> 启动后将作业拆分一个个的 Task，然后向 <code>ResourceManager</code> 请求 <code>Container</code> 资源用于运行 Task，并定时向 <code>ResourceManager</code> 发送心跳</li>
+<li><code>ApplicationMaster</code> 请求到资源后，<code>ApplicationMaster</code> 会跟对应的 <code>NodeManager</code> 通信，并将 Task 分发到对应的 <code>NodeManager</code> 中的 <code>Container</code> 中运行。</li>
+<li><code>ApplicationMaster</code> 定时向 <code>ResourceManager</code> 发送心跳，汇报作业运行情况。程序运行完成后再向 <code>ResourceManager</code> 注销释放资源。 </li>
+</ol>
+</li>
+<li><p>Spark On YARN</p>
+<p> 首先看下 Spark 资源管理架构图：<br> <img src="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418150911" class="lazy" data-srcset="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418150911" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="图片"><br> 组件说明：</p>
+<ul>
+<li>ClusterManager ：也就是 Master，是 Spark 的主控节点，可以部署多个 Master，但是只有一个是 active 状态。</li>
+<li>Work：是 Spark 的工作节点，向 Master 汇报资源、Executor 的执行状态，由 Master 控制 Worker 的启动。</li>
+<li>Driver：是应用程序的驱动程序，每个应用包含多个小任务，Driver 负责推动这些小任务执行。</li>
+<li>Executor：是 Spark 的工作进程，由 Worker 管理，负责具体任务的执行。</li>
+</ul>
+<p> Spark 的架构与 YARN 的架构非常像，简单看下角色的对比，Master 与 <code>ResourceManager</code> 相对应，Worker 和 <code>NodeManager</code> 对应，Driver 和 <code>ApplicationMaster</code> 对应，Executor 和 <code>Container</code> 相对应。</p>
+<p> Spark 的部署模式：</p>
+<ul>
+<li>Local 模式：部署在同一个进程中，只有 Driver 角色，接受任务后创建 Driver 负责应用的调度执行，不涉及 Master 和 Worker；</li>
+<li>Local- Cluster 模式：部署在同一个进程上，存在 Master 和 Worker 角色，它们作为独立线程存在于这个进程内；</li>
+<li>Standalone：Spark 真正的集群模式，在这个模式下 Master 和 Worker 是独立的进程；</li>
+<li>第三方部署模式：构建于 YARN 或者 Mesos 上，由第三方负责资源管理。</li>
+</ul>
+<p> Spark On YARN-Cluster 部署流程：</p>
+<ol>
+<li>Client 向 <code>ResourceManager</code> 提交任务</li>
+<li><code>ResourceManager</code> 接收任务并找到一个 Container 创建 <code>ApplicationMaster</code>，此时 <code>ApplicationMaster</code> 上运行的是 Spark Driver</li>
+<li><code>ApplicationMaster</code> 向 <code>ResourceManager</code> 申请 <code>Container</code> 并启动</li>
+<li>Spark Driver 在 <code>Container</code> 上启动 Spark Executor，并调度 Spark Task 在 Spark Executor 上运行</li>
+<li>等作业执行完后向 <code>ResourceManager</code> 注销释放资源<br><img src="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418161432.jpeg" class="lazy" data-srcset="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418161432.jpeg" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="图片"></li>
+</ol>
+<p> 可以看出这个执行流程和 Yarn 对一个任务的处理过程几乎一致，不同的是在 Spark on Yarn 的 Job 处理过程中 App Master、Container 是交由 Spark 相对应的角色去处理的。</p>
+<p> Spark on YARN 还有一种部署方式：Spark On YARN-Client，与 Spark On YARN-Cluster 的区别就是 Spark on Yarn-Client 的客户端在提交完任务之后不会将 Spark Driver 托管给 Yarn，而是在客户端运行。App Master 申请完 Container 之后同样也是由 Spark Driver 去启动 Spark Executor，执行任务。<br> <img src="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418170340" class="lazy" data-srcset="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/20210418170340" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="图片"></p>
+</li>
+<li><p>参考资料</p>
+<p> <a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/54192454">深入浅出 Hadoop YARN</a></p>
+<p> <a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s?__biz=MzU5ODU5MjM2Mw==&mid=2247484270&idx=2&sn=f287173c5d676625f11c7ef415b81cf4&chksm=fe409d6ac937147c2bd197104a3e4070c9d12786c9c37c17d699039a5d96858cafcc8eee53e5&scene=21#wechat_redirect">Spark on Yarn | Spark，从入门到精通</a></p>
+</li>
+</ol>
+
+    </div>
+     
+    <div class="post-footer__meta"><p>updated at 2022-03-04</p></div> 
+    <div class="post-entry__tags"><a href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="post-tags__link button"># 大数据</a><a href="/tags/Spark/" class="post-tags__link button"># Spark</a><a href="/tags/YARN/" class="post-tags__link button"># YARN</a></div> 
+</article>
+
+
+    <div class="nav">
+        <div class="nav__prev">
+            
+                <a href="/2021/04/19/Spark-increment-id/" class="nav__link">
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M589.088 790.624L310.464 512l278.624-278.624 45.248 45.248L400.96 512l233.376 233.376z" fill="#808080"></path></svg>
+                    </div>
+                    <div>
+                        <div class="nav__label">
+                            Previous Post
+                        </div>
+                        <div class="nav__title">
+                            Spark DataFrame 自增 ID
+                        </div>
+                    </div>
+                </a>
+            
+        </div>
+        <div class="nav__next">
+            
+                <a href="/2020/09/20/Java-memory-model/" class="nav__link">
+                    <div>
+                        <div class="nav__label">
+                            Next Post
+                        </div>
+                        <div class="nav__title">
+                            JAVA 并发 —— 内存模型
+                        </div>
+                    </div>
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M434.944 790.624l-45.248-45.248L623.04 512l-233.376-233.376 45.248-45.248L713.568 512z" fill="#808080"></path></svg>
+                    </div>
+                </a>
+            
+        </div>
+    </div>
+
+
+
+    <div class="post__comments content-card" id="comment">
+        
+    <h4>Comments</h4>
+    
+    
+    
+    
+    
+    <div id="gitalk-container"></div>
+
+    
+    
+    
+    
+    
+    
+
+
+    </div>
+
+
+
+</main>
+
+            <footer class="footer">
+     
+    <a href="#" class="button" id="b2t" aria-label="Back to Top" title="Back to Top">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="32" height="32">
+            <path d="M233.376 722.752L278.624 768 512 534.624 745.376 768l45.248-45.248L512 444.128zM192 352h640V288H192z" fill="currentColor"></path>
+        </svg>
+    </a>
+
+    
+
+
+    
+    
+    
+        <span id="busuanzi_container_site_uv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_uv"></span>
+            <span>Viewers</span>
+            
+                <span>|</span>
+            
+        </span>
+    
+    
+        <span id="busuanzi_container_site_pv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_pv"></span>
+            <span>Views</span>
+            
+        </span>
+    
+ 
+ 
+
+ 
+    
+        
+        <p class="footer-copyright">
+            Copyright © 2022 <a href="/">大白</a>
+        </p>
+    
+    
+    <p>Powered by <a href="https://hexo.io" target="_blank">Hexo</a> | Theme - <a href="https://github.com/ChrAlpha/hexo-theme-cards" target="_blank">Cards</a></p>
+</footer>
+
+        </div>
+        
+    <script defer src="https://cdn.jsdelivr.net/npm/vanilla-lazyload@17.1.0/dist/lazyload.min.js"></script>
+    <script>
+        window.lazyLoadOptions = {
+            elements_selector: ".lazy",
+            threshold: 0
+        };
+    </script>
+ 
+
+ 
+    <script>
+        window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+        ga('create', 'UA-178473615-1', 'auto');
+        ga('send', 'pageview');
+    </script>
+    <script async src="https://www.google-analytics.com/analytics.js"></script>
+ 
+
+ 
+
+ 
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement('script');
+            hm.src = 'https://hm.baidu.com/hm.js?fb2dded415192023dd108d2b441862de';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+ 
+
+ 
+
+
+
+ 
+
+
+
+ 
+
+
+    
+ 
+
+
+    
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.4.1/dist/jquery.min.js"></script>
+
+    
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.css">
+
+    
+<script src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.js"></script>
+
+    <script>
+        let lazyloadT = Boolean('true'),
+            auto_fancybox = Boolean('true')
+        if (auto_fancybox) {
+            $(".post__content").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        } else {
+            $(".post__content").find("fancybox").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        }
+    </script>
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+    
+
+    
+    
+    
+
+    
+    
+    
+    <script>
+        function loadComment() {
+            let e, i;
+            (e = document.createElement("script")).src = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js',
+            document.body.appendChild(e);
+            e.onload = () => {
+                var gitalk = new Gitalk({
+                    clientID: '5343251f7191333c2cf8',
+                    clientSecret: 'c0471f2aaeafdec2f9ad0edfd4df7404db114101',
+                    repo: 'big-white-2020.github.io',
+                    owner: 'big-white-2020',
+                    admin: 'big-white-2020',
+                    id: window.location.pathname,
+                    distractionFreeMode: false
+                });
+                gitalk.render('gitalk-container');
+            };
+            (i = document.createElement("link")).rel = "stylesheet",
+            i.href = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css',
+            document.head.appendChild(i);
+        }
+    
+        var runningOnBrowser = typeof window !== "undefined";
+        var isBot = runningOnBrowser && !("onscroll" in window) || typeof navigator !== "undefined" && /(gle|ing|ro|msn)bot|crawl|spider|yand|duckgo/i.test(navigator.userAgent);
+        var supportsIntersectionObserver = runningOnBrowser && "IntersectionObserver" in window;
+    
+        setTimeout(function () {
+            if (!isBot && supportsIntersectionObserver) {
+                var comment_observer = new IntersectionObserver(function(entries) {
+                    if (entries[0].isIntersecting) {
+                        loadComment();
+                        comment_observer.disconnect();
+                    }
+                }, { threshold: [0] });
+                comment_observer.observe(document.getElementById('comment'));
+            } else {
+                loadComment();
+            }
+        }, 1);
+    </script>
+
+    
+    
+
+    
+    
+    
+    
+    
+
+    
+    
+    
+
+
+
+    </body>
+</html>

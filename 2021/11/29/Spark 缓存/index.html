@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    <meta charset="utf-8">
+
+    
+
+    <!-- 渲染优化 -->
+    <meta name="renderer" content="webkit">
+    <meta name="force-rendering" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+    <meta name="HandheldFriendly" content="True" >
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+    <!--icon-->
+
+    
+    
+        <link rel="icon" type="image/png" sizes="16x16" href="/function%20small()%20%7B%20%5Bnative%20code%5D%20%7D">
+    
+    
+    
+    
+
+
+    <!-- meta -->
+
+
+<title>Spark 缓存 | 大白</title>
+
+
+    <meta name="keywords" content="大数据, Spark">
+
+
+
+
+    <!-- OpenGraph -->
+ 
+    <meta name="description" content="Spark 缓存 Spark 有个特点叫惰性计算，也就是只有碰到 action 算子才会触发计算。如果 RDD 的 transform 算子过多时，可以通过缓存的方式加快运算速度，例如 12345678910 val words &#x3D; spark.sparkContext.textFile(&quot;README.md&quot;)            .flatMap(l &#x3D;&gt; l.sp">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark 缓存">
+<meta property="og:url" content="http://example.com/2021/11/29/Spark%20%E7%BC%93%E5%AD%98/index.html">
+<meta property="og:site_name" content="大白">
+<meta property="og:description" content="Spark 缓存 Spark 有个特点叫惰性计算，也就是只有碰到 action 算子才会触发计算。如果 RDD 的 transform 算子过多时，可以通过缓存的方式加快运算速度，例如 12345678910 val words &#x3D; spark.sparkContext.textFile(&quot;README.md&quot;)            .flatMap(l &#x3D;&gt; l.sp">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2021-11-29T12:27:00.000Z">
+<meta property="article:modified_time" content="2022-03-03T16:55:34.473Z">
+<meta property="article:author" content="yajun Li">
+<meta property="article:tag" content="大数据">
+<meta property="article:tag" content="Spark">
+<meta name="twitter:card" content="summary_large_image">
+
+
+    
+<link rel="stylesheet" href="/css/style/main.css">
+ 
+
+    
+    
+        <link rel="stylesheet" id="hl-default-theme" href="/css/highlight/github.css" media="none" >
+        
+    
+
+    
+    
+
+    
+    
+<link rel="stylesheet" href="/css/style/dark.css">
+
+    
+<script src="/js/darkmode.js"></script>
+
+
+
+     
+    <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+ 
+
+    <!-- custom head -->
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+    <body>
+        <div id="app">
+            <header class="header">
+    <div class="header__left">
+        <a href="/" class="button">
+            <span class="logo__text">大白</span>
+        </a>
+    </div>
+    <div class="header__right">
+        
+            <div class="navbar__menus">
+                
+                    <a href="/" class="navbar-menu button">首页</a>
+                
+                    <a href="/tags/" class="navbar-menu button">标签</a>
+                
+                    <a href="/archives/" class="navbar-menu button">归档</a>
+                
+            </div>
+        
+        
+        
+    <a href="/search/" id="btn-search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="24" height="24" fill="currentColor" stroke="currentColor" stroke-width="32"><path d="M192 448c0-141.152 114.848-256 256-256s256 114.848 256 256-114.848 256-256 256-256-114.848-256-256z m710.624 409.376l-206.88-206.88A318.784 318.784 0 0 0 768 448c0-176.736-143.264-320-320-320S128 271.264 128 448s143.264 320 320 320a318.784 318.784 0 0 0 202.496-72.256l206.88 206.88 45.248-45.248z"></path></svg>
+    </a>
+
+
+        
+        
+    <a href="javaScript:void(0);" id="btn-toggle-dark">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </a>
+
+
+        
+            <a class="dropdown-icon button" id="btn-dropdown" tabindex="0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width='24' height='24' fill="none" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round"><path fill="currentColor" d="M3.314,4.8h13.372c0.41,0,0.743-0.333,0.743-0.743c0-0.41-0.333-0.743-0.743-0.743H3.314c-0.41,0-0.743,0.333-0.743,0.743C2.571,4.467,2.904,4.8,3.314,4.8z M16.686,15.2H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,15.2,16.686,15.2z M16.686,9.257H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,9.257,16.686,9.257z"></path></svg></a>
+            <div class="dropdown-menus" id="dropdown-menus">
+                
+                    <a href="/" class="dropdown-menu button">首页</a>
+                
+                    <a href="/tags/" class="dropdown-menu button">标签</a>
+                
+                    <a href="/archives/" class="dropdown-menu button">归档</a>
+                
+            </div>
+        
+    </div>
+</header>
+
+
+            <main class="main">
+    
+
+<div class="post-title">
+    <h1 class="post-title__text">
+        Spark 缓存
+    </h1>
+    <div class="post-title__meta">
+        <a href="/archives/2021/11/" class="post-meta__date button">2021-11-29</a>
+        
+ 
+        
+    
+     
+    <span id="busuanzi_container_page_pv" hidden>
+        <span class="separate-dot"></span>
+        <span></span>
+        <span id="busuanzi_value_page_pv"></span>
+        <span>Views</span>
+    </span>
+
+
+
+ 
+
+ 
+		| 本篇文章共<span class="post-count">2.1k字</span>，预计阅读<span class="post-count">9分钟</span>
+    </div>
+</div>
+
+
+
+<article class="post content-card">
+    <div class="post__header"></div>
+    <div class="post__content">
+        <p>Spark 缓存</p>
+<p>Spark 有个特点叫惰性计算，也就是只有碰到 action 算子才会触发计算。如果 RDD 的 transform 算子过多时，可以通过缓存的方式加快运算速度，例如</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"> <span class="keyword">val</span> words = spark.sparkContext.textFile(<span class="string">&quot;README.md&quot;</span>)</span><br><span class="line">            .flatMap(l =&gt; l.split(<span class="string">&quot;\\s+&quot;</span>))</span><br><span class="line">            .map(w =&gt; w.toLowerCase)</span><br><span class="line">            .map(w =&gt; w -&gt; <span class="number">1</span>L)</span><br><span class="line">			.reduceByKey(_ + _)</span><br><span class="line"></span><br><span class="line"><span class="comment">// 碰到 action 算子，进行计算</span></span><br><span class="line">words.foreach(println)</span><br><span class="line"><span class="comment">// 碰到 action 算子，进行计算</span></span><br><span class="line"><span class="keyword">val</span> count = words.count()</span><br></pre></td></tr></table></figure>
+
+<p>上面这个例子中，首先读入 readme.md 文件，并进行一系列的 transform 操作，直到碰到 <code>foreach</code> 和 <code>count</code> 两个 action 算子才触发计算，但是由于中间没有进行缓存，两个 action 算子都要从头进行计算。</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"> <span class="keyword">val</span> words = spark.sparkContext.textFile(<span class="string">&quot;README.md&quot;</span>)</span><br><span class="line">            .flatMap(l =&gt; l.split(<span class="string">&quot;\\s+&quot;</span>))</span><br><span class="line">            .map(w =&gt; w.toLowerCase)</span><br><span class="line">            .map(w =&gt; w -&gt; <span class="number">1</span>L)</span><br><span class="line">			.reduceByKey(_ + _)</span><br><span class="line">			.cache</span><br><span class="line"></span><br><span class="line"><span class="comment">// 第一次碰到 action 算子，进行计算，并将 transform RDD 结果缓存</span></span><br><span class="line">words.foreach(println)</span><br><span class="line"><span class="comment">// 第二次碰到 action 算子，直接使用之前缓存的 RDD 进行计算</span></span><br><span class="line"><span class="keyword">val</span> count = words.count()</span><br></pre></td></tr></table></figure>
+
+<p>在 transform 算子链的最后加上 <code>cache</code> 或者 <code>persist</code> 算子对之前的 RDD 进行缓存。然后在第一碰到 action 算子进行计算时就会将前面 RDD 的结果缓存起来，第二次碰到 action 时就可以直接使用了，不必在从头开始算了。</p>
+<p>我们在使用 Spark 时对数据进行持久化（或者称为缓存）时经常使用 cache 或 persist 算子，那么这两个算子的区别在哪呢？</p>
+<h4 id="persist-vs-cache"><a href="#persist-vs-cache" class="headerlink" title="persist vs cache"></a>persist vs cache</h4><p>首先来看下 cache，在 <code>RDD#cache</code> 中，<code>cache</code> 方法直接调用了 <code>persist</code> </p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">cache</span></span>(): <span class="keyword">this</span>.<span class="keyword">type</span> = persist()</span><br></pre></td></tr></table></figure>
+
+<p>好吧，那就看看 persist</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// RDD 类成员变量</span></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">var</span> storageLevel: <span class="type">StorageLevel</span> = <span class="type">StorageLevel</span>.<span class="type">NONE</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">persist</span></span>(): <span class="keyword">this</span>.<span class="keyword">type</span> = persist(<span class="type">StorageLevel</span>.<span class="type">MEMORY_ONLY</span>)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">persist</span></span>(newLevel: <span class="type">StorageLevel</span>): <span class="keyword">this</span>.<span class="keyword">type</span> = &#123;</span><br><span class="line">  <span class="keyword">if</span> (isLocallyCheckpointed) &#123;</span><br><span class="line">     persist(<span class="type">LocalRDDCheckpointData</span>.transformStorageLevel(newLevel), allowOverride = <span class="literal">true</span>)</span><br><span class="line">   &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">     persist(newLevel, allowOverride = <span class="literal">false</span>)</span><br><span class="line">   &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>persist</code> 有两个个方法，分别是默认存储级别，可选存储级别，之后会讲到什么是存储级别，现在先把它理解为数据存在内存中还是磁盘中。</p>
+<p>由上面可以知道 <code>cache</code> 算子其实就是存储级别为 <code>MEMORY_ONLY</code> 的 <code>persist</code> 算子，所以如果不指定存储级别调用 <code>cache</code> 和 <code>persist</code> 效果是一样的。</p>
+<p>接着看 <code>persist</code></p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">persist</span></span>(newLevel: <span class="type">StorageLevel</span>, allowOverride: <span class="type">Boolean</span>): <span class="keyword">this</span>.<span class="keyword">type</span> = &#123;</span><br><span class="line">  	<span class="comment">// 已经缓存过了 &amp;&amp; 新传入的存储级别 != 现在的存储级别 &amp;&amp; 不允许修改覆盖级别</span></span><br><span class="line">    <span class="keyword">if</span> (storageLevel != <span class="type">StorageLevel</span>.<span class="type">NONE</span> &amp;&amp; newLevel != storageLevel &amp;&amp; !allowOverride) &#123;</span><br><span class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> <span class="type">UnsupportedOperationException</span>(</span><br><span class="line">        <span class="string">&quot;Cannot change storage level of an RDD after it was already assigned a level&quot;</span>)</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 第一次缓存时</span></span><br><span class="line">    <span class="keyword">if</span> (storageLevel == <span class="type">StorageLevel</span>.<span class="type">NONE</span>) &#123;</span><br><span class="line">      sc.cleaner.foreach(_.registerRDDForCleanup(<span class="keyword">this</span>))</span><br><span class="line">        </span><br><span class="line">      <span class="comment">// 将 rdd 记录到一个 map 中</span></span><br><span class="line">      sc.persistRDD(<span class="keyword">this</span>)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 修改存储级别</span></span><br><span class="line">    storageLevel = newLevel</span><br><span class="line">    <span class="keyword">this</span></span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// SparkContext#persistentRdds</span></span><br><span class="line"><span class="keyword">private</span>[spark] <span class="keyword">val</span> persistentRdds = &#123;</span><br><span class="line">    <span class="keyword">val</span> map: <span class="type">ConcurrentMap</span>[<span class="type">Int</span>, <span class="type">RDD</span>[_]] = <span class="keyword">new</span> <span class="type">MapMaker</span>().weakValues().makeMap[<span class="type">Int</span>, <span class="type">RDD</span>[_]]()</span><br><span class="line">    map.asScala</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// SparkContext#persistRDD</span></span><br><span class="line"><span class="keyword">private</span>[spark] <span class="function"><span class="keyword">def</span> <span class="title">persistRDD</span></span>(rdd: <span class="type">RDD</span>[_]): <span class="type">Unit</span> = &#123;</span><br><span class="line">    persistentRdds(rdd.id) = rdd</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，<code>persist</code> 算子并没将数据缓存到内存或这磁盘，只是简单的记录了一下需要缓存的 RDD，因为 <code>persist</code> 算子并不是 action 算子，真正的缓存需要第一次碰到 action 算子才会触发。</p>
+<p>在 RDD 类中定义了一个迭代器，RDD#iterator，用于迭代访问数据</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">final</span> <span class="function"><span class="keyword">def</span> <span class="title">iterator</span></span>(split: <span class="type">Partition</span>, context: <span class="type">TaskContext</span>): <span class="type">Iterator</span>[<span class="type">T</span>] = &#123;</span><br><span class="line">    <span class="keyword">if</span> (storageLevel != <span class="type">StorageLevel</span>.<span class="type">NONE</span>) &#123;</span><br><span class="line">      getOrCompute(split, context)</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      computeOrReadCheckpoint(split, context)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<p>在访问数据时就会判断 <code>storageLevel</code> 是否修改过（是否有调用过 cache 或 persist 算子），如果 <code>storageLevel</code> 修改过则会进入 <code>getOrCompute</code> 方法</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[spark] <span class="function"><span class="keyword">def</span> <span class="title">getOrCompute</span></span>(partition: <span class="type">Partition</span>, context: <span class="type">TaskContext</span>): <span class="type">Iterator</span>[<span class="type">T</span>] = &#123;</span><br><span class="line">    <span class="keyword">val</span> blockId = <span class="type">RDDBlockId</span>(id, partition.index)</span><br><span class="line">    <span class="keyword">var</span> readCachedBlock = <span class="literal">true</span></span><br><span class="line">    <span class="type">SparkEnv</span>.get.blockManager.getOrElseUpdate(blockId, storageLevel, elementClassTag, () =&gt; &#123;</span><br><span class="line">      readCachedBlock = <span class="literal">false</span></span><br><span class="line">      computeOrReadCheckpoint(partition, context)</span><br><span class="line">    &#125;) <span class="keyword">match</span> &#123;</span><br><span class="line">        <span class="comment">// 省略</span></span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后根据 <code>blockManager</code> 获取或者更新数据</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">getOrElseUpdate</span></span>[<span class="type">T</span>](</span><br><span class="line">      blockId: <span class="type">BlockId</span>,</span><br><span class="line">      level: <span class="type">StorageLevel</span>,</span><br><span class="line">      classTag: <span class="type">ClassTag</span>[<span class="type">T</span>],</span><br><span class="line">      makeIterator: () =&gt; <span class="type">Iterator</span>[<span class="type">T</span>]): <span class="type">Either</span>[<span class="type">BlockResult</span>, <span class="type">Iterator</span>[<span class="type">T</span>]] = &#123;</span><br><span class="line">   </span><br><span class="line">    <span class="comment">// 如果之前有缓存过，则能够获取</span></span><br><span class="line">    get[<span class="type">T</span>](blockId)(classTag) <span class="keyword">match</span> &#123;</span><br><span class="line">      <span class="keyword">case</span> <span class="type">Some</span>(block) =&gt;</span><br><span class="line">        <span class="keyword">return</span> <span class="type">Left</span>(block)</span><br><span class="line">      <span class="keyword">case</span> _ =&gt;</span><br><span class="line">        <span class="comment">// Need to compute the block.</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 第一次调用，进行缓存</span></span><br><span class="line">    doPutIterator(blockId, makeIterator, level, classTag, keepReadLock = <span class="literal">true</span>) <span class="keyword">match</span> &#123;</span><br><span class="line">      <span class="comment">// 省略</span></span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">doPutIterator</span></span>[<span class="type">T</span>](</span><br><span class="line">      blockId: <span class="type">BlockId</span>,</span><br><span class="line">      iterator: () =&gt; <span class="type">Iterator</span>[<span class="type">T</span>],</span><br><span class="line">      level: <span class="type">StorageLevel</span>,</span><br><span class="line">      classTag: <span class="type">ClassTag</span>[<span class="type">T</span>],</span><br><span class="line">      tellMaster: <span class="type">Boolean</span> = <span class="literal">true</span>,</span><br><span class="line">      keepReadLock: <span class="type">Boolean</span> = <span class="literal">false</span>): <span class="type">Option</span>[<span class="type">PartiallyUnrolledIterator</span>[<span class="type">T</span>]] = &#123;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 获取 blockLock</span></span><br><span class="line">    doPut(blockId, level, classTag, tellMaster = tellMaster, keepReadLock = keepReadLock) &#123; info =&gt;</span><br><span class="line">      <span class="keyword">val</span> startTimeNs = <span class="type">System</span>.nanoTime()</span><br><span class="line">      <span class="keyword">var</span> iteratorFromFailedMemoryStorePut: <span class="type">Option</span>[<span class="type">PartiallyUnrolledIterator</span>[<span class="type">T</span>]] = <span class="type">None</span></span><br><span class="line">      <span class="comment">// Size of the block in bytes</span></span><br><span class="line">      <span class="keyword">var</span> size = <span class="number">0</span>L</span><br><span class="line">        </span><br><span class="line">        <span class="comment">// 如果存储级别允许使用内存则将数据缓存在内存中</span></span><br><span class="line">      <span class="keyword">if</span> (level.useMemory) &#123;</span><br><span class="line">          <span class="comment">// 需要反序列化</span></span><br><span class="line">        <span class="keyword">if</span> (level.deserialized) &#123;</span><br><span class="line">          memoryStore.putIteratorAsValues(blockId, iterator(), classTag) <span class="keyword">match</span> &#123;</span><br><span class="line">            <span class="keyword">case</span> <span class="type">Right</span>(s) =&gt;</span><br><span class="line">              size = s</span><br><span class="line">            <span class="keyword">case</span> <span class="type">Left</span>(iter) =&gt;</span><br><span class="line">              <span class="comment">// 内存空间不够，且存储级别允许使用磁盘，则删除内存中数据写入磁盘中</span></span><br><span class="line">              <span class="keyword">if</span> (level.useDisk) &#123;</span><br><span class="line">                logWarning(<span class="string">s&quot;Persisting block <span class="subst">$blockId</span> to disk instead.&quot;</span>)</span><br><span class="line">                diskStore.put(blockId) &#123; channel =&gt;</span><br><span class="line">                  <span class="keyword">val</span> out = <span class="type">Channels</span>.newOutputStream(channel)</span><br><span class="line">                  serializerManager.dataSerializeStream(blockId, out, iter)(classTag)</span><br><span class="line">                &#125;</span><br><span class="line">                size = diskStore.getSize(blockId)</span><br><span class="line">              &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                iteratorFromFailedMemoryStorePut = <span class="type">Some</span>(iter)</span><br><span class="line">              &#125;</span><br><span class="line">          &#125;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123; <span class="comment">// 不需要反序列化</span></span><br><span class="line">          memoryStore.putIteratorAsBytes(blockId, iterator(), classTag, level.memoryMode) <span class="keyword">match</span> &#123;</span><br><span class="line">            <span class="keyword">case</span> <span class="type">Right</span>(s) =&gt;</span><br><span class="line">              size = s</span><br><span class="line">            <span class="keyword">case</span> <span class="type">Left</span>(partiallySerializedValues) =&gt;</span><br><span class="line">              <span class="comment">// 内存空间不够，且存储级别允许使用磁盘，则删除内存中数据写入磁盘中</span></span><br><span class="line">              <span class="keyword">if</span> (level.useDisk) &#123;</span><br><span class="line">                logWarning(<span class="string">s&quot;Persisting block <span class="subst">$blockId</span> to disk instead.&quot;</span>)</span><br><span class="line">                diskStore.put(blockId) &#123; channel =&gt;</span><br><span class="line">                  <span class="keyword">val</span> out = <span class="type">Channels</span>.newOutputStream(channel)</span><br><span class="line">                  partiallySerializedValues.finishWritingToStream(out)</span><br><span class="line">                &#125;</span><br><span class="line">                size = diskStore.getSize(blockId)</span><br><span class="line">              &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                 <span class="comment">// 不允许使用磁盘，部分数据分区将不再缓存，在每次需要用到这些数据时重新进行计算</span></span><br><span class="line">                iteratorFromFailedMemoryStorePut = <span class="type">Some</span>(partiallySerializedValues.valuesIterator)</span><br><span class="line">              &#125;</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;</span><br><span class="line">		<span class="comment">// 如果存储级别允许使用磁盘则将数据缓存在磁盘中</span></span><br><span class="line">      &#125; <span class="keyword">else</span> <span class="keyword">if</span> (level.useDisk) &#123;</span><br><span class="line">        diskStore.put(blockId) &#123; channel =&gt;</span><br><span class="line">          <span class="keyword">val</span> out = <span class="type">Channels</span>.newOutputStream(channel)</span><br><span class="line">          serializerManager.dataSerializeStream(blockId, out, iterator())(classTag)</span><br><span class="line">        &#125;</span><br><span class="line">        size = diskStore.getSize(blockId)</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 获取缓存的状态，使用多少内存空间、使用多少磁盘空间</span></span><br><span class="line">      <span class="keyword">val</span> putBlockStatus = getCurrentBlockStatus(blockId, info)</span><br><span class="line">      <span class="keyword">val</span> blockWasSuccessfullyStored = putBlockStatus.storageLevel.isValid</span><br><span class="line">      <span class="keyword">if</span> (blockWasSuccessfullyStored) &#123;</span><br><span class="line">        <span class="comment">// block 已经缓存在内存或这磁盘中，通知 master 当前的存储状态</span></span><br><span class="line">        info.size = size</span><br><span class="line">        <span class="keyword">if</span> (tellMaster &amp;&amp; info.tellMaster) &#123;</span><br><span class="line">          reportBlockStatus(blockId, putBlockStatus)</span><br><span class="line">        &#125;</span><br><span class="line">          <span class="comment">// 添加缓存状态到 metrics 中</span></span><br><span class="line">        addUpdatedBlockStatusToTaskMetrics(blockId, putBlockStatus)</span><br><span class="line">        <span class="comment">// 如果存储级别使用多个副本，则需要备份多分数据</span></span><br><span class="line">        <span class="keyword">if</span> (level.replication &gt; <span class="number">1</span>) &#123;</span><br><span class="line">          <span class="comment">// 省略...</span></span><br><span class="line">          <span class="comment">// 备份数据  </span></span><br><span class="line">          replicate(blockId, bytesToReplicate, level, remoteClassTag)</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">      </span><br><span class="line">      iteratorFromFailedMemoryStorePut</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<p>至此，持久化就已经完成了，后续如果有 action 算子使用这个 RDD 则直接从内存或者磁盘中获取，不需要重新计算了。</p>
+<h4 id="删除数据"><a href="#删除数据" class="headerlink" title="删除数据"></a>删除数据</h4><p>Spark 自动监控各个节点上的缓存使用率，并以最近最少使用的方式（LRU）将旧数据块移除内存。如果想手动移除一个 RDD，而不是等待该 RDD 被 Spark 自动移除，可以使用 RDD.unpersist() 方法</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">unpersist</span></span>(blocking: <span class="type">Boolean</span> = <span class="literal">false</span>): <span class="keyword">this</span>.<span class="keyword">type</span> = &#123;</span><br><span class="line">    sc.unpersistRDD(id, blocking)</span><br><span class="line">    storageLevel = <span class="type">StorageLevel</span>.<span class="type">NONE</span></span><br><span class="line">    <span class="keyword">this</span></span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="存储级别"><a href="#存储级别" class="headerlink" title="存储级别"></a>存储级别</h4><p>Spark 的存储级别有以下几种</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">val</span> <span class="type">NONE</span> = <span class="keyword">new</span> <span class="type">StorageLevel</span>(<span class="literal">false</span>, <span class="literal">false</span>, <span class="literal">false</span>, <span class="literal">false</span>)                   </span><br><span class="line"><span class="keyword">val</span> <span class="type">DISK_ONLY</span> = <span class="keyword">new</span> <span class="type">StorageLevel</span>(<span class="literal">true</span>, <span class="literal">false</span>, <span class="literal">false</span>, <span class="literal">false</span>)               </span><br><span class="line"><span class="keyword">val</span> <span class="type">DISK_ONLY_2</span> = <span class="keyword">new</span> <span class="type">StorageLevel</span>(<span class="literal">true</span>, <span class="literal">false</span>, <span class="literal">false</span>, <span class="literal">false</span>, <span class="number">2</span>)          </span><br><span class="line"><span class="keyword">val</span> <span class="type">MEMORY_ONLY</span> = <span class="keyword">new</span> <span class="type">StorageLevel</span>(<span class="literal">false</span>, <span class="literal">true</span>, <span class="literal">false</span>, <span class="literal">true</span>) <span class="comment">// 默认存储级别           </span></span><br><span class="line"><span class="keyword">val</span> <span class="type">MEMORY_ONLY_2</span> = <span class="keyword">new</span> <span class="type">StorageLevel</span>(<span class="literal">false</span>, <span class="literal">true</span>, <span class="literal">false</span>, <span class="literal">true</span>, <span class="number">2</span>)         </span><br><span class="line"><span class="keyword">val</span> <span class="type">MEMORY_ONLY_SER</span> = <span class="keyword">new</span> <span class="type">StorageLevel</span>(<span class="literal">false</span>, <span class="literal">true</span>, <span class="literal">false</span>, <span class="literal">false</span>)         </span><br><span class="line"><span class="keyword">val</span> <span class="type">MEMORY_ONLY_SER_2</span> = <span class="keyword">new</span> <span class="type">StorageLevel</span>(<span class="literal">false</span>, <span class="literal">true</span>, <span class="literal">false</span>, <span class="literal">false</span>, <span class="number">2</span>)    </span><br><span class="line"><span class="keyword">val</span> <span class="type">MEMORY_AND_DISK</span> = <span class="keyword">new</span> <span class="type">StorageLevel</span>(<span class="literal">true</span>, <span class="literal">true</span>, <span class="literal">false</span>, <span class="literal">true</span>)           </span><br><span class="line"><span class="keyword">val</span> <span class="type">MEMORY_AND_DISK_2</span> = <span class="keyword">new</span> <span class="type">StorageLevel</span>(<span class="literal">true</span>, <span class="literal">true</span>, <span class="literal">false</span>, <span class="literal">true</span>, <span class="number">2</span>)      </span><br><span class="line"><span class="keyword">val</span> <span class="type">MEMORY_AND_DISK_SER</span> = <span class="keyword">new</span> <span class="type">StorageLevel</span>(<span class="literal">true</span>, <span class="literal">true</span>, <span class="literal">false</span>, <span class="literal">false</span>)      </span><br><span class="line"><span class="keyword">val</span> <span class="type">MEMORY_AND_DISK_SER_2</span> = <span class="keyword">new</span> <span class="type">StorageLevel</span>(<span class="literal">true</span>, <span class="literal">true</span>, <span class="literal">false</span>, <span class="literal">false</span>, <span class="number">2</span>) </span><br><span class="line"><span class="keyword">val</span> <span class="type">OFF_HEAP</span> = <span class="keyword">new</span> <span class="type">StorageLevel</span>(<span class="literal">true</span>, <span class="literal">true</span>, <span class="literal">true</span>, <span class="literal">false</span>, <span class="number">1</span>) <span class="comment">// 使用堆外内存存储        </span></span><br></pre></td></tr></table></figure>
+
+<p>这几个存储级别是通过以下几个参数组合得到的</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">useDisk</span><br><span class="line">useMemory</span><br><span class="line">useOffHeap</span><br><span class="line">deserialized</span><br><span class="line">replication</span><br></pre></td></tr></table></figure>
+
+<p>解释一下这几种存储级别，其中 <code>DISK_ONLY</code>、<code>MEMORY_ONLY</code>、<code>MEMORY_AND_DISK</code> 都好理解，就是只使用磁盘、只使用内存、使用内存和磁盘。</p>
+<p><code>DISK_ONLY_2</code>、<code>MEMORY_ONLY_2</code> 这种后缀有个 2 的表示 replication 为 2，即两份副本</p>
+<p><code>MEMORY_ONLY_SER</code>、<code>MEMORY_AND_DISK_SER</code> 这种后缀带 <code>SER</code> 表示以序列化的 Java 对象的形式进行存储，这种存储比较省空间，但是读取时需要反序列化，会损耗一些 CPU 计算时间</p>
+<p>最后提一下 cache/persist 与 checkpoint 的区别：</p>
+<p>cache/persist 是将数据写到本机内存或磁盘中，随着作业运行失败或执行完成，数据将被清除。</p>
+<p>checkpoint 一般是将数据写到远程文件系统，作业运行失败或完成数据都可以保存。cache/persist 只是将数据保存起来，并不会破坏 lineage。checkpoint 会切断 lineage，在第一个 Action 算子被调用时触发，且在这个 Job 执行完成后，才会从后往前回溯找到标记了 checkpoint 的 RDD，然后新启动一个 Job 执行 checkpoint 任务。建议对checkpoint 的 RDD 使用 Cache 缓存，这样 checkpoint 的 job 只需从 Cache 缓存中读取数据即可，否则需要再从头计算一次 RDD。</p>
+<h4 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h4><p><a target="_blank" rel="noopener" href="https://dongkelun.com/2018/06/03/sparkCacheAndPersist/">Spark 持久化（cache和persist的区别）</a></p>
+<p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/151835412">RDD的cache和persist原理</a></p>
+
+    </div>
+     
+    <div class="post-footer__meta"><p>updated at 2022-03-04</p></div> 
+    <div class="post-entry__tags"><a href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="post-tags__link button"># 大数据</a><a href="/tags/Spark/" class="post-tags__link button"># Spark</a></div> 
+</article>
+
+
+    <div class="nav">
+        <div class="nav__prev">
+            
+                <a href="/2021/12/01/Spark%20%E5%AD%98%E5%82%A8%E7%B3%BB%E7%BB%9F7%E2%80%94BlockManager/" class="nav__link">
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M589.088 790.624L310.464 512l278.624-278.624 45.248 45.248L400.96 512l233.376 233.376z" fill="#808080"></path></svg>
+                    </div>
+                    <div>
+                        <div class="nav__label">
+                            Previous Post
+                        </div>
+                        <div class="nav__title">
+                            Spark 存储系统7—BlockManager
+                        </div>
+                    </div>
+                </a>
+            
+        </div>
+        <div class="nav__next">
+            
+                <a href="/2021/09/05/Spark%20%E7%BB%9F%E4%B8%80%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86%E5%99%A8/" class="nav__link">
+                    <div>
+                        <div class="nav__label">
+                            Next Post
+                        </div>
+                        <div class="nav__title">
+                            Spark 统一内存管理器
+                        </div>
+                    </div>
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M434.944 790.624l-45.248-45.248L623.04 512l-233.376-233.376 45.248-45.248L713.568 512z" fill="#808080"></path></svg>
+                    </div>
+                </a>
+            
+        </div>
+    </div>
+
+
+
+    <div class="post__comments content-card" id="comment">
+        
+    <h4>Comments</h4>
+    
+    
+    
+    
+    
+    <div id="gitalk-container"></div>
+
+    
+    
+    
+    
+    
+    
+
+
+    </div>
+
+
+
+</main>
+
+            <footer class="footer">
+     
+    <a href="#" class="button" id="b2t" aria-label="Back to Top" title="Back to Top">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="32" height="32">
+            <path d="M233.376 722.752L278.624 768 512 534.624 745.376 768l45.248-45.248L512 444.128zM192 352h640V288H192z" fill="currentColor"></path>
+        </svg>
+    </a>
+
+    
+
+
+    
+    
+    
+        <span id="busuanzi_container_site_uv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_uv"></span>
+            <span>Viewers</span>
+            
+                <span>|</span>
+            
+        </span>
+    
+    
+        <span id="busuanzi_container_site_pv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_pv"></span>
+            <span>Views</span>
+            
+        </span>
+    
+ 
+ 
+
+ 
+    
+        
+        <p class="footer-copyright">
+            Copyright © 2022 <a href="/">大白</a>
+        </p>
+    
+    
+    <p>Powered by <a href="https://hexo.io" target="_blank">Hexo</a> | Theme - <a href="https://github.com/ChrAlpha/hexo-theme-cards" target="_blank">Cards</a></p>
+</footer>
+
+        </div>
+        
+    <script defer src="https://cdn.jsdelivr.net/npm/vanilla-lazyload@17.1.0/dist/lazyload.min.js"></script>
+    <script>
+        window.lazyLoadOptions = {
+            elements_selector: ".lazy",
+            threshold: 0
+        };
+    </script>
+ 
+
+ 
+    <script>
+        window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+        ga('create', 'UA-178473615-1', 'auto');
+        ga('send', 'pageview');
+    </script>
+    <script async src="https://www.google-analytics.com/analytics.js"></script>
+ 
+
+ 
+
+ 
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement('script');
+            hm.src = 'https://hm.baidu.com/hm.js?fb2dded415192023dd108d2b441862de';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+ 
+
+ 
+
+
+
+ 
+
+
+
+ 
+
+
+    
+ 
+
+
+    
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.4.1/dist/jquery.min.js"></script>
+
+    
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.css">
+
+    
+<script src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.js"></script>
+
+    <script>
+        let lazyloadT = Boolean('true'),
+            auto_fancybox = Boolean('true')
+        if (auto_fancybox) {
+            $(".post__content").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        } else {
+            $(".post__content").find("fancybox").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        }
+    </script>
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+    
+
+    
+    
+    
+
+    
+    
+    
+    <script>
+        function loadComment() {
+            let e, i;
+            (e = document.createElement("script")).src = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js',
+            document.body.appendChild(e);
+            e.onload = () => {
+                var gitalk = new Gitalk({
+                    clientID: '5343251f7191333c2cf8',
+                    clientSecret: 'c0471f2aaeafdec2f9ad0edfd4df7404db114101',
+                    repo: 'big-white-2020.github.io',
+                    owner: 'big-white-2020',
+                    admin: 'big-white-2020',
+                    id: window.location.pathname,
+                    distractionFreeMode: false
+                });
+                gitalk.render('gitalk-container');
+            };
+            (i = document.createElement("link")).rel = "stylesheet",
+            i.href = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css',
+            document.head.appendChild(i);
+        }
+    
+        var runningOnBrowser = typeof window !== "undefined";
+        var isBot = runningOnBrowser && !("onscroll" in window) || typeof navigator !== "undefined" && /(gle|ing|ro|msn)bot|crawl|spider|yand|duckgo/i.test(navigator.userAgent);
+        var supportsIntersectionObserver = runningOnBrowser && "IntersectionObserver" in window;
+    
+        setTimeout(function () {
+            if (!isBot && supportsIntersectionObserver) {
+                var comment_observer = new IntersectionObserver(function(entries) {
+                    if (entries[0].isIntersecting) {
+                        loadComment();
+                        comment_observer.disconnect();
+                    }
+                }, { threshold: [0] });
+                comment_observer.observe(document.getElementById('comment'));
+            } else {
+                loadComment();
+            }
+        }, 1);
+    </script>
+
+    
+    
+
+    
+    
+    
+    
+    
+
+    
+    
+    
+
+
+
+    </body>
+</html>

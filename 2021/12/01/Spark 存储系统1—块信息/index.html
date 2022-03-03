@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    <meta charset="utf-8">
+
+    
+
+    <!-- 渲染优化 -->
+    <meta name="renderer" content="webkit">
+    <meta name="force-rendering" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+    <meta name="HandheldFriendly" content="True" >
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+    <!--icon-->
+
+    
+    
+        <link rel="icon" type="image/png" sizes="16x16" href="/function%20small()%20%7B%20%5Bnative%20code%5D%20%7D">
+    
+    
+    
+    
+
+
+    <!-- meta -->
+
+
+<title>Spark 存储系统1—块信息 | 大白</title>
+
+
+    <meta name="keywords" content="大数据, Spark">
+
+
+
+
+    <!-- OpenGraph -->
+ 
+    <meta name="description" content="Spark 中有个重要的组件 BlockManager（块管理器），负责 Spark 存储管理。由名称可知，Spark 的存储系统的基本单位是由 Block ，那我们就从 Block 入手，学习一下 Spark 的存储系统。 块主要包含三个主要的实现，块 id，块数据和块元信息，分别对应三个类 BlockId、BlockData 和 BlockInfo BlockId： 先来看下块 id，块 id">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark 存储系统1—块信息">
+<meta property="og:url" content="http://example.com/2021/12/01/Spark%20%E5%AD%98%E5%82%A8%E7%B3%BB%E7%BB%9F1%E2%80%94%E5%9D%97%E4%BF%A1%E6%81%AF/index.html">
+<meta property="og:site_name" content="大白">
+<meta property="og:description" content="Spark 中有个重要的组件 BlockManager（块管理器），负责 Spark 存储管理。由名称可知，Spark 的存储系统的基本单位是由 Block ，那我们就从 Block 入手，学习一下 Spark 的存储系统。 块主要包含三个主要的实现，块 id，块数据和块元信息，分别对应三个类 BlockId、BlockData 和 BlockInfo BlockId： 先来看下块 id，块 id">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/2021/08/31/d76df53343fd03077be01b20d74f076a-n6bqvcws0a-9de00c.jpeg">
+<meta property="og:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/2021/08/31/9581f115ebb938d99cea313c4bfe4cb1-image-20210831205940895-b952a6.png">
+<meta property="article:published_time" content="2021-12-01T12:27:00.000Z">
+<meta property="article:modified_time" content="2022-03-03T16:55:34.473Z">
+<meta property="article:author" content="yajun Li">
+<meta property="article:tag" content="大数据">
+<meta property="article:tag" content="Spark">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/2021/08/31/d76df53343fd03077be01b20d74f076a-n6bqvcws0a-9de00c.jpeg">
+
+
+    
+<link rel="stylesheet" href="/css/style/main.css">
+ 
+
+    
+    
+        <link rel="stylesheet" id="hl-default-theme" href="/css/highlight/github.css" media="none" >
+        
+    
+
+    
+    
+
+    
+    
+<link rel="stylesheet" href="/css/style/dark.css">
+
+    
+<script src="/js/darkmode.js"></script>
+
+
+
+     
+    <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+ 
+
+    <!-- custom head -->
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+    <body>
+        <div id="app">
+            <header class="header">
+    <div class="header__left">
+        <a href="/" class="button">
+            <span class="logo__text">大白</span>
+        </a>
+    </div>
+    <div class="header__right">
+        
+            <div class="navbar__menus">
+                
+                    <a href="/" class="navbar-menu button">首页</a>
+                
+                    <a href="/tags/" class="navbar-menu button">标签</a>
+                
+                    <a href="/archives/" class="navbar-menu button">归档</a>
+                
+            </div>
+        
+        
+        
+    <a href="/search/" id="btn-search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="24" height="24" fill="currentColor" stroke="currentColor" stroke-width="32"><path d="M192 448c0-141.152 114.848-256 256-256s256 114.848 256 256-114.848 256-256 256-256-114.848-256-256z m710.624 409.376l-206.88-206.88A318.784 318.784 0 0 0 768 448c0-176.736-143.264-320-320-320S128 271.264 128 448s143.264 320 320 320a318.784 318.784 0 0 0 202.496-72.256l206.88 206.88 45.248-45.248z"></path></svg>
+    </a>
+
+
+        
+        
+    <a href="javaScript:void(0);" id="btn-toggle-dark">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </a>
+
+
+        
+            <a class="dropdown-icon button" id="btn-dropdown" tabindex="0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width='24' height='24' fill="none" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round"><path fill="currentColor" d="M3.314,4.8h13.372c0.41,0,0.743-0.333,0.743-0.743c0-0.41-0.333-0.743-0.743-0.743H3.314c-0.41,0-0.743,0.333-0.743,0.743C2.571,4.467,2.904,4.8,3.314,4.8z M16.686,15.2H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,15.2,16.686,15.2z M16.686,9.257H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,9.257,16.686,9.257z"></path></svg></a>
+            <div class="dropdown-menus" id="dropdown-menus">
+                
+                    <a href="/" class="dropdown-menu button">首页</a>
+                
+                    <a href="/tags/" class="dropdown-menu button">标签</a>
+                
+                    <a href="/archives/" class="dropdown-menu button">归档</a>
+                
+            </div>
+        
+    </div>
+</header>
+
+
+            <main class="main">
+    
+
+<div class="post-title">
+    <h1 class="post-title__text">
+        Spark 存储系统1—块信息
+    </h1>
+    <div class="post-title__meta">
+        <a href="/archives/2021/12/" class="post-meta__date button">2021-12-01</a>
+        
+ 
+        
+    
+     
+    <span id="busuanzi_container_page_pv" hidden>
+        <span class="separate-dot"></span>
+        <span></span>
+        <span id="busuanzi_value_page_pv"></span>
+        <span>Views</span>
+    </span>
+
+
+
+ 
+
+ 
+		| 本篇文章共<span class="post-count">1.2k字</span>，预计阅读<span class="post-count">5分钟</span>
+    </div>
+</div>
+
+
+
+<article class="post content-card">
+    <div class="post__header"></div>
+    <div class="post__content">
+        <p>Spark 中有个重要的组件 <code>BlockManager</code>（块管理器），负责 Spark 存储管理。由名称可知，Spark 的存储系统的基本单位是由 <code>Block</code> ，那我们就从 <code>Block</code> 入手，学习一下 Spark 的存储系统。</p>
+<p>块主要包含三个主要的实现，块 id，块数据和块元信息，分别对应三个类 <code>BlockId</code>、<code>BlockData</code> 和 <code>BlockInfo</code></p>
+<p><code>BlockId</code>：</p>
+<p>先来看下块 id，块 id 与 RDD id 不同的一点是，RDD id 是一个整数，而块 id 是一个类。BlockId 的抽象类如下</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">sealed</span> <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">BlockId</span> </span>&#123;</span><br><span class="line">  <span class="comment">// 块的唯一名称</span></span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">name</span></span>: <span class="type">String</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 转成 RDD id</span></span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">asRDDId</span></span>: <span class="type">Option</span>[<span class="type">RDDBlockId</span>] = <span class="keyword">if</span> (isRDD) <span class="type">Some</span>(asInstanceOf[<span class="type">RDDBlockId</span>]) <span class="keyword">else</span> <span class="type">None</span></span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">isRDD</span></span>: <span class="type">Boolean</span> = isInstanceOf[<span class="type">RDDBlockId</span>]</span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">isShuffle</span></span>: <span class="type">Boolean</span> = isInstanceOf[<span class="type">ShuffleBlockId</span>] || isInstanceOf[<span class="type">ShuffleBlockBatchId</span>]</span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">isBroadcast</span></span>: <span class="type">Boolean</span> = isInstanceOf[<span class="type">BroadcastBlockId</span>]</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">toString</span></span>: <span class="type">String</span> = name</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>除了块名称之外还有三个 isXXX 方法，判断当前的 BlockId 是否为 <code>RDDBlockId</code>、<code>ShuffleBlockId</code>、<code>BroadcastBlockId</code>，这三个类都是 <code>BlockId</code> 的主要实现类。</p>
+<p><img src="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/2021/08/31/d76df53343fd03077be01b20d74f076a-n6bqvcws0a-9de00c.jpeg" class="lazy" data-srcset="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/2021/08/31/d76df53343fd03077be01b20d74f076a-n6bqvcws0a-9de00c.jpeg" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="n6bqvcws0a"></p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@DeveloperApi</span></span><br><span class="line"><span class="keyword">case</span> <span class="class"><span class="keyword">class</span> <span class="title">RDDBlockId</span>(<span class="params">rddId: <span class="type">Int</span>, splitIndex: <span class="type">Int</span></span>) <span class="keyword">extends</span> <span class="title">BlockId</span> </span>&#123;</span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">name</span></span>: <span class="type">String</span> = <span class="string">&quot;rdd_&quot;</span> + rddId + <span class="string">&quot;_&quot;</span> + splitIndex</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">@DeveloperApi</span></span><br><span class="line"><span class="keyword">case</span> <span class="class"><span class="keyword">class</span> <span class="title">ShuffleBlockId</span>(<span class="params">shuffleId: <span class="type">Int</span>, mapId: <span class="type">Long</span>, reduceId: <span class="type">Int</span></span>) <span class="keyword">extends</span> <span class="title">BlockId</span> </span>&#123;</span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">name</span></span>: <span class="type">String</span> = <span class="string">&quot;shuffle_&quot;</span> + shuffleId + <span class="string">&quot;_&quot;</span> + mapId + <span class="string">&quot;_&quot;</span> + reduceId</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">@DeveloperApi</span></span><br><span class="line"><span class="keyword">case</span> <span class="class"><span class="keyword">class</span> <span class="title">BroadcastBlockId</span>(<span class="params">broadcastId: <span class="type">Long</span>, field: <span class="type">String</span> = &quot;&quot;</span>) <span class="keyword">extends</span> <span class="title">BlockId</span> </span>&#123;</span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">name</span></span>: <span class="type">String</span> = <span class="string">&quot;broadcast_&quot;</span> + broadcastId + (<span class="keyword">if</span> (field == <span class="string">&quot;&quot;</span>) <span class="string">&quot;&quot;</span> <span class="keyword">else</span> <span class="string">&quot;_&quot;</span> + field)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>三个实现类也只是覆盖了 <code>name</code> 为不同的组合方式，而 <code>BlockId</code> 的伴生对象中也是根据 <code>name</code> 的生成方式区分不同的实现类</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">val</span> <span class="type">RDD</span> = <span class="string">&quot;rdd_([0-9]+)_([0-9]+)&quot;</span>.r</span><br><span class="line"><span class="keyword">val</span> <span class="type">SHUFFLE</span> = <span class="string">&quot;shuffle_([0-9]+)_([0-9]+)_([0-9]+)&quot;</span>.r</span><br><span class="line"><span class="keyword">val</span> <span class="type">SHUFFLE_BATCH</span> = <span class="string">&quot;shuffle_([0-9]+)_([0-9]+)_([0-9]+)_([0-9]+)&quot;</span>.r</span><br><span class="line"><span class="keyword">val</span> <span class="type">SHUFFLE_DATA</span> = <span class="string">&quot;shuffle_([0-9]+)_([0-9]+)_([0-9]+).data&quot;</span>.r</span><br><span class="line"><span class="keyword">val</span> <span class="type">SHUFFLE_INDEX</span> = <span class="string">&quot;shuffle_([0-9]+)_([0-9]+)_([0-9]+).index&quot;</span>.r</span><br><span class="line"><span class="keyword">val</span> <span class="type">BROADCAST</span> = <span class="string">&quot;broadcast_([0-9]+)([_A-Za-z0-9]*)&quot;</span>.r</span><br><span class="line"><span class="keyword">val</span> <span class="type">TASKRESULT</span> = <span class="string">&quot;taskresult_([0-9]+)&quot;</span>.r</span><br><span class="line"><span class="keyword">val</span> <span class="type">STREAM</span> = <span class="string">&quot;input-([0-9]+)-([0-9]+)&quot;</span>.r</span><br><span class="line"><span class="keyword">val</span> <span class="type">TEMP_LOCAL</span> = <span class="string">&quot;temp_local_([-A-Fa-f0-9]+)&quot;</span>.r</span><br><span class="line"><span class="keyword">val</span> <span class="type">TEMP_SHUFFLE</span> = <span class="string">&quot;temp_shuffle_([-A-Fa-f0-9]+)&quot;</span>.r</span><br><span class="line"><span class="keyword">val</span> <span class="type">TEST</span> = <span class="string">&quot;test_(.*)&quot;</span>.r</span><br></pre></td></tr></table></figure>
+
+<p><code>BlockId</code> 只是封装了 <code>Block</code> 的名称，并没有封装数据，<code>Block</code> 的数据封装在 <code>BlockData</code> 中，<code>BlockData</code> 是一个特质（接口）类，定义一些接口。</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[spark] <span class="class"><span class="keyword">trait</span> <span class="title">BlockData</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">   <span class="comment">// 将 BlockData 转成 InputStream</span></span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">toInputStream</span></span>(): <span class="type">InputStream</span></span><br><span class="line"></span><br><span class="line">   <span class="comment">// 将 BlockData 转成 Netty 中传输的格式</span></span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">toNetty</span></span>(): <span class="type">Object</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 转成 ChunkedByteBuffer</span></span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">toChunkedByteBuffer</span></span>(allocator: <span class="type">Int</span> =&gt; <span class="type">ByteBuffer</span>): <span class="type">ChunkedByteBuffer</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 转成 java.nio.ByteBuffer</span></span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">toByteBuffer</span></span>(): <span class="type">ByteBuffer</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// BlockData 大小</span></span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">size</span></span>: <span class="type">Long</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 销毁 BlockData</span></span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">dispose</span></span>(): <span class="type">Unit</span></span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>BlockData</code> 中定义了一些转换接口，特别说明一下 <code>ChunkedByteBuffer</code> 是由多个 <code>ByteBuffer</code> 包装而成，表示多个不连续的内存缓冲区数据。</p>
+<p><code>BlockData</code> 有三个实现类，分别是基于内存和 <code>ChunkedByteBuffer</code> 的 <code>ByteBufferBlockData</code>，基于磁盘的 <code>DiskBlockData</code> 和加密的 <code>EncryptedBlockData</code></p>
+<p><img src="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/2021/08/31/9581f115ebb938d99cea313c4bfe4cb1-image-20210831205940895-b952a6.png" class="lazy" data-srcset="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/2021/08/31/9581f115ebb938d99cea313c4bfe4cb1-image-20210831205940895-b952a6.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20210831205940895"></p>
+<p>以 <code>ByteBufferBlockData</code> 为例，下面是 <code>ByteBufferBlockData</code> 的代码</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[spark] <span class="class"><span class="keyword">class</span> <span class="title">ByteBufferBlockData</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="class">    val buffer: <span class="type">ChunkedByteBuffer</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    val shouldDispose: <span class="type">Boolean</span></span>) <span class="keyword">extends</span> <span class="title">BlockData</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">toInputStream</span></span>(): <span class="type">InputStream</span> = buffer.toInputStream(dispose = <span class="literal">false</span>)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">toNetty</span></span>(): <span class="type">Object</span> = buffer.toNetty</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">toChunkedByteBuffer</span></span>(allocator: <span class="type">Int</span> =&gt; <span class="type">ByteBuffer</span>): <span class="type">ChunkedByteBuffer</span> = &#123;</span><br><span class="line">    buffer.copy(allocator)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">toByteBuffer</span></span>(): <span class="type">ByteBuffer</span> = buffer.toByteBuffer</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">size</span></span>: <span class="type">Long</span> = buffer.size</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">dispose</span></span>(): <span class="type">Unit</span> = &#123;</span><br><span class="line">    <span class="keyword">if</span> (shouldDispose) &#123;</span><br><span class="line">      buffer.dispose()</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看出 <code>ByteBufferBlockData</code> 就是代理了 <code>ChunkedByteBuffer</code> 所以再看一下 <code>ChunkedByteBuffer</code></p>
+<p><code>ChunkedByteBuffer</code> 的属性</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[spark] <span class="class"><span class="keyword">class</span> <span class="title">ChunkedByteBuffer</span>(<span class="params">var chunks: <span class="type">Array</span>[<span class="type">ByteBuffer</span>]</span>) </span>&#123;</span><br><span class="line"></span><br><span class="line"> <span class="comment">// chunk buffer 缓冲大小，通过 spark.buffer.write.chunkSize 配置，默认 64MB</span></span><br><span class="line"> <span class="keyword">private</span> <span class="keyword">val</span> bufferWriteChunkSize =</span><br><span class="line">   <span class="type">Option</span>(<span class="type">SparkEnv</span>.get).map(_.conf.get(config.<span class="type">BUFFER_WRITE_CHUNK_SIZE</span>))</span><br><span class="line">     .getOrElse(config.<span class="type">BUFFER_WRITE_CHUNK_SIZE</span>.defaultValue.get).toInt</span><br><span class="line"></span><br><span class="line"> <span class="comment">// 是否已经销毁</span></span><br><span class="line"> <span class="keyword">private</span>[<span class="keyword">this</span>] <span class="keyword">var</span> disposed: <span class="type">Boolean</span> = <span class="literal">false</span></span><br><span class="line"></span><br><span class="line"> <span class="comment">// chunk buffer 中各 byteBuffer 大小的和即为 chunk buffer 的大小</span></span><br><span class="line"> <span class="keyword">val</span> size: <span class="type">Long</span> = chunks.map(_.limit().asInstanceOf[<span class="type">Long</span>]).sum</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>ChunkedByteBuffer</code> 的构造方法参数是一个 <code>Array[ByteBuffer]</code>，也就是说，其实 <code>ChunkedByteBuffer</code> 就是一个 <code>ByteBuffer</code> 数组，即一个 <code>chunk</code> 就是一个 <code>ByteBuffer</code>。</p>
+<p>另外还提供了一个 <code>writeFully</code> 方法将数据以 <code>bufferWriteChunkSize</code> 大小写入 <code>NIO Channel</code></p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">writeFully</span></span>(channel: <span class="type">WritableByteChannel</span>): <span class="type">Unit</span> = &#123;</span><br><span class="line">    <span class="keyword">for</span> (bytes &lt;- getChunks()) &#123;</span><br><span class="line">      <span class="keyword">val</span> originalLimit = bytes.limit()</span><br><span class="line">      <span class="keyword">while</span> (bytes.hasRemaining) &#123;</span><br><span class="line">        <span class="keyword">val</span> ioSize = <span class="type">Math</span>.min(bytes.remaining(), bufferWriteChunkSize)</span><br><span class="line">        bytes.limit(bytes.position() + ioSize)</span><br><span class="line">        channel.write(bytes)</span><br><span class="line">        bytes.limit(originalLimit)</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<p>其它方法以后碰到了再了解。</p>
+<p>最后还剩一个块元信息——<code>BlockInfo</code></p>
+<p>先上代码</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[storage] <span class="class"><span class="keyword">class</span> <span class="title">BlockInfo</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="class">    </span></span></span><br><span class="line"><span class="params"><span class="class">    // 期望存储等级，不是实际存储情况，例如设定了 <span class="type">StorageLevel</span>.<span class="type">MEMORY_AND_DISK</span>，也可能只存储在内存中</span></span></span><br><span class="line"><span class="params"><span class="class">    val level: <span class="type">StorageLevel</span>,</span></span></span><br><span class="line"><span class="params"><span class="class">    </span></span></span><br><span class="line"><span class="params"><span class="class">    // <span class="type">Block</span> 的类标签，用于序列化和反序列化</span></span></span><br><span class="line"><span class="params"><span class="class">    val classTag: <span class="type">ClassTag</span>[_],</span></span></span><br><span class="line"><span class="params"><span class="class">    </span></span></span><br><span class="line"><span class="params"><span class="class">    // 是否需要将块信息同步给 <span class="type">Master</span></span></span></span><br><span class="line"><span class="params"><span class="class">    val tellMaster: <span class="type">Boolean</span></span>) </span>&#123;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">size</span></span>: <span class="type">Long</span> = _size</span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">size_=</span></span>(s: <span class="type">Long</span>): <span class="type">Unit</span> = &#123;</span><br><span class="line">    _size = s</span><br><span class="line">    checkInvariants()</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">private</span>[<span class="keyword">this</span>] <span class="keyword">var</span> _size: <span class="type">Long</span> = <span class="number">0</span></span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">readerCount</span></span>: <span class="type">Int</span> = _readerCount</span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">readerCount_=</span></span>(c: <span class="type">Int</span>): <span class="type">Unit</span> = &#123;</span><br><span class="line">    _readerCount = c</span><br><span class="line">    checkInvariants()</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">private</span>[<span class="keyword">this</span>] <span class="keyword">var</span> _readerCount: <span class="type">Int</span> = <span class="number">0</span></span><br><span class="line">    </span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">writerTask</span></span>: <span class="type">Long</span> = _writerTask</span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">writerTask_=</span></span>(t: <span class="type">Long</span>): <span class="type">Unit</span> = &#123;</span><br><span class="line">    _writerTask = t</span><br><span class="line">    checkInvariants()</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">private</span>[<span class="keyword">this</span>] <span class="keyword">var</span> _writerTask: <span class="type">Long</span> = <span class="type">BlockInfo</span>.<span class="type">NO_WRITER</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">checkInvariants</span></span>(): <span class="type">Unit</span> = &#123;   </span><br><span class="line">    assert(_readerCount == <span class="number">0</span> || _writerTask == <span class="type">BlockInfo</span>.<span class="type">NO_WRITER</span>)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  checkInvariants()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>除了 <code>level</code>、<code>classTag</code>、<code>tellMaster</code> 三个属性外，<code>BlockInfo</code> 还定义了三对 getter/setter 方法，分别是 </p>
+<ul>
+<li>size：Block 的大小，单位为字节</li>
+<li>readerCount：读取当前块的 task 个数，用于加读锁</li>
+<li>writerTask：写当前块的 task，用于加写锁</li>
+</ul>
+<p><code>BlockInfo</code> 的锁是由 <code>BlockInfoManager</code> 管理的，之后再一起学习。</p>
+<p>参考资料</p>
+<p><a target="_blank" rel="noopener" href="https://cloud.tencent.com/developer/article/1491360">Spark Core源码精读计划21 | Spark Block的基本实现</a></p>
+
+    </div>
+     
+    <div class="post-footer__meta"><p>updated at 2022-03-04</p></div> 
+    <div class="post-entry__tags"><a href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="post-tags__link button"># 大数据</a><a href="/tags/Spark/" class="post-tags__link button"># Spark</a></div> 
+</article>
+
+
+    <div class="nav">
+        <div class="nav__prev">
+            
+                <a href="/2021/12/08/SparkSQL/" class="nav__link">
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M589.088 790.624L310.464 512l278.624-278.624 45.248 45.248L400.96 512l233.376 233.376z" fill="#808080"></path></svg>
+                    </div>
+                    <div>
+                        <div class="nav__label">
+                            Previous Post
+                        </div>
+                        <div class="nav__title">
+                            SparkSQL
+                        </div>
+                    </div>
+                </a>
+            
+        </div>
+        <div class="nav__next">
+            
+                <a href="/2021/12/01/Spark%20%E5%AD%98%E5%82%A8%E7%B3%BB%E7%BB%9F2%E2%80%94BlockInfoManager%20%E8%AF%BB%E5%86%99%E9%94%81%E7%AE%A1%E7%90%86/" class="nav__link">
+                    <div>
+                        <div class="nav__label">
+                            Next Post
+                        </div>
+                        <div class="nav__title">
+                            Spark 存储系统2—BlockInfoManager 读写锁管理
+                        </div>
+                    </div>
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M434.944 790.624l-45.248-45.248L623.04 512l-233.376-233.376 45.248-45.248L713.568 512z" fill="#808080"></path></svg>
+                    </div>
+                </a>
+            
+        </div>
+    </div>
+
+
+
+    <div class="post__comments content-card" id="comment">
+        
+    <h4>Comments</h4>
+    
+    
+    
+    
+    
+    <div id="gitalk-container"></div>
+
+    
+    
+    
+    
+    
+    
+
+
+    </div>
+
+
+
+</main>
+
+            <footer class="footer">
+     
+    <a href="#" class="button" id="b2t" aria-label="Back to Top" title="Back to Top">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="32" height="32">
+            <path d="M233.376 722.752L278.624 768 512 534.624 745.376 768l45.248-45.248L512 444.128zM192 352h640V288H192z" fill="currentColor"></path>
+        </svg>
+    </a>
+
+    
+
+
+    
+    
+    
+        <span id="busuanzi_container_site_uv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_uv"></span>
+            <span>Viewers</span>
+            
+                <span>|</span>
+            
+        </span>
+    
+    
+        <span id="busuanzi_container_site_pv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_pv"></span>
+            <span>Views</span>
+            
+        </span>
+    
+ 
+ 
+
+ 
+    
+        
+        <p class="footer-copyright">
+            Copyright © 2022 <a href="/">大白</a>
+        </p>
+    
+    
+    <p>Powered by <a href="https://hexo.io" target="_blank">Hexo</a> | Theme - <a href="https://github.com/ChrAlpha/hexo-theme-cards" target="_blank">Cards</a></p>
+</footer>
+
+        </div>
+        
+    <script defer src="https://cdn.jsdelivr.net/npm/vanilla-lazyload@17.1.0/dist/lazyload.min.js"></script>
+    <script>
+        window.lazyLoadOptions = {
+            elements_selector: ".lazy",
+            threshold: 0
+        };
+    </script>
+ 
+
+ 
+    <script>
+        window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+        ga('create', 'UA-178473615-1', 'auto');
+        ga('send', 'pageview');
+    </script>
+    <script async src="https://www.google-analytics.com/analytics.js"></script>
+ 
+
+ 
+
+ 
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement('script');
+            hm.src = 'https://hm.baidu.com/hm.js?fb2dded415192023dd108d2b441862de';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+ 
+
+ 
+
+
+
+ 
+
+
+
+ 
+
+
+    
+ 
+
+
+    
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.4.1/dist/jquery.min.js"></script>
+
+    
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.css">
+
+    
+<script src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.js"></script>
+
+    <script>
+        let lazyloadT = Boolean('true'),
+            auto_fancybox = Boolean('true')
+        if (auto_fancybox) {
+            $(".post__content").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        } else {
+            $(".post__content").find("fancybox").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        }
+    </script>
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+    
+
+    
+    
+    
+
+    
+    
+    
+    <script>
+        function loadComment() {
+            let e, i;
+            (e = document.createElement("script")).src = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js',
+            document.body.appendChild(e);
+            e.onload = () => {
+                var gitalk = new Gitalk({
+                    clientID: '5343251f7191333c2cf8',
+                    clientSecret: 'c0471f2aaeafdec2f9ad0edfd4df7404db114101',
+                    repo: 'big-white-2020.github.io',
+                    owner: 'big-white-2020',
+                    admin: 'big-white-2020',
+                    id: window.location.pathname,
+                    distractionFreeMode: false
+                });
+                gitalk.render('gitalk-container');
+            };
+            (i = document.createElement("link")).rel = "stylesheet",
+            i.href = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css',
+            document.head.appendChild(i);
+        }
+    
+        var runningOnBrowser = typeof window !== "undefined";
+        var isBot = runningOnBrowser && !("onscroll" in window) || typeof navigator !== "undefined" && /(gle|ing|ro|msn)bot|crawl|spider|yand|duckgo/i.test(navigator.userAgent);
+        var supportsIntersectionObserver = runningOnBrowser && "IntersectionObserver" in window;
+    
+        setTimeout(function () {
+            if (!isBot && supportsIntersectionObserver) {
+                var comment_observer = new IntersectionObserver(function(entries) {
+                    if (entries[0].isIntersecting) {
+                        loadComment();
+                        comment_observer.disconnect();
+                    }
+                }, { threshold: [0] });
+                comment_observer.observe(document.getElementById('comment'));
+            } else {
+                loadComment();
+            }
+        }, 1);
+    </script>
+
+    
+    
+
+    
+    
+    
+    
+    
+
+    
+    
+    
+
+
+
+    </body>
+</html>

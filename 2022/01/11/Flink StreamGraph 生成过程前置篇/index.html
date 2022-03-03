@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    <meta charset="utf-8">
+
+    
+
+    <!-- 渲染优化 -->
+    <meta name="renderer" content="webkit">
+    <meta name="force-rendering" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+    <meta name="HandheldFriendly" content="True" >
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+    <!--icon-->
+
+    
+    
+        <link rel="icon" type="image/png" sizes="16x16" href="/function%20small()%20%7B%20%5Bnative%20code%5D%20%7D">
+    
+    
+    
+    
+
+
+    <!-- meta -->
+
+
+<title>Flink-1.14 源码分析--StreamGraph 生成过程前置篇 | 大白</title>
+
+
+    <meta name="keywords" content="Flink, 大数据, 源码分析">
+
+
+
+
+    <!-- OpenGraph -->
+ 
+    <meta name="description" content="在 Flink 任务提交流程中 提到在 Flink Client 端会运行我们编写代码中的 main() 方法，然后生成 JobGraph，再将 JobGraph 提交到 Flink Cluster。 说起 Graph，自然而然就想到了 Spark 的 DAG（Directed Acyclic Graph，有向无环图），DAG 中包含顶点和边。Spark 的 RDD 就是根据这个 DAG 进行流转">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Flink-1.14 源码分析--StreamGraph 生成过程前置篇">
+<meta property="og:url" content="http://example.com/2022/01/11/Flink%20StreamGraph%20%E7%94%9F%E6%88%90%E8%BF%87%E7%A8%8B%E5%89%8D%E7%BD%AE%E7%AF%87/index.html">
+<meta property="og:site_name" content="大白">
+<meta property="og:description" content="在 Flink 任务提交流程中 提到在 Flink Client 端会运行我们编写代码中的 main() 方法，然后生成 JobGraph，再将 JobGraph 提交到 Flink Cluster。 说起 Graph，自然而然就想到了 Spark 的 DAG（Directed Acyclic Graph，有向无环图），DAG 中包含顶点和边。Spark 的 RDD 就是根据这个 DAG 进行流转">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201101909241.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201101916586.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201101947475.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111030260.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111045914.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111039187.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111940504.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111944821.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111946810.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111950208.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201102339134.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/202112262149857.svg">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112016515.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112016345.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112304987.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112325615.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112340996.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112342572.png">
+<meta property="article:published_time" content="2022-01-11T15:52:09.000Z">
+<meta property="article:modified_time" content="2022-03-03T16:55:34.473Z">
+<meta property="article:author" content="yajun Li">
+<meta property="article:tag" content="Flink">
+<meta property="article:tag" content="大数据">
+<meta property="article:tag" content="源码分析">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201101909241.png">
+
+
+    
+<link rel="stylesheet" href="/css/style/main.css">
+ 
+
+    
+    
+        <link rel="stylesheet" id="hl-default-theme" href="/css/highlight/github.css" media="none" >
+        
+    
+
+    
+    
+
+    
+    
+<link rel="stylesheet" href="/css/style/dark.css">
+
+    
+<script src="/js/darkmode.js"></script>
+
+
+
+     
+    <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+ 
+
+    <!-- custom head -->
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+    <body>
+        <div id="app">
+            <header class="header">
+    <div class="header__left">
+        <a href="/" class="button">
+            <span class="logo__text">大白</span>
+        </a>
+    </div>
+    <div class="header__right">
+        
+            <div class="navbar__menus">
+                
+                    <a href="/" class="navbar-menu button">首页</a>
+                
+                    <a href="/tags/" class="navbar-menu button">标签</a>
+                
+                    <a href="/archives/" class="navbar-menu button">归档</a>
+                
+            </div>
+        
+        
+        
+    <a href="/search/" id="btn-search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="24" height="24" fill="currentColor" stroke="currentColor" stroke-width="32"><path d="M192 448c0-141.152 114.848-256 256-256s256 114.848 256 256-114.848 256-256 256-256-114.848-256-256z m710.624 409.376l-206.88-206.88A318.784 318.784 0 0 0 768 448c0-176.736-143.264-320-320-320S128 271.264 128 448s143.264 320 320 320a318.784 318.784 0 0 0 202.496-72.256l206.88 206.88 45.248-45.248z"></path></svg>
+    </a>
+
+
+        
+        
+    <a href="javaScript:void(0);" id="btn-toggle-dark">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </a>
+
+
+        
+            <a class="dropdown-icon button" id="btn-dropdown" tabindex="0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width='24' height='24' fill="none" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round"><path fill="currentColor" d="M3.314,4.8h13.372c0.41,0,0.743-0.333,0.743-0.743c0-0.41-0.333-0.743-0.743-0.743H3.314c-0.41,0-0.743,0.333-0.743,0.743C2.571,4.467,2.904,4.8,3.314,4.8z M16.686,15.2H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,15.2,16.686,15.2z M16.686,9.257H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,9.257,16.686,9.257z"></path></svg></a>
+            <div class="dropdown-menus" id="dropdown-menus">
+                
+                    <a href="/" class="dropdown-menu button">首页</a>
+                
+                    <a href="/tags/" class="dropdown-menu button">标签</a>
+                
+                    <a href="/archives/" class="dropdown-menu button">归档</a>
+                
+            </div>
+        
+    </div>
+</header>
+
+
+            <main class="main">
+    
+
+<div class="post-title">
+    <h1 class="post-title__text">
+        Flink-1.14 源码分析--StreamGraph 生成过程前置篇
+    </h1>
+    <div class="post-title__meta">
+        <a href="/archives/2022/01/" class="post-meta__date button">2022-01-11</a>
+        
+ 
+        
+    
+     
+    <span id="busuanzi_container_page_pv" hidden>
+        <span class="separate-dot"></span>
+        <span></span>
+        <span id="busuanzi_value_page_pv"></span>
+        <span>Views</span>
+    </span>
+
+
+
+ 
+
+ 
+		| 本篇文章共<span class="post-count">3k字</span>，预计阅读<span class="post-count">11分钟</span>
+    </div>
+</div>
+
+
+
+<article class="post content-card">
+    <div class="post__header"></div>
+    <div class="post__content">
+        <p>在 <a target="_blank" rel="noopener" href="https://blog.muzili.online/2022/01/09/Flink%20%E4%BB%BB%E5%8A%A1%E6%8F%90%E4%BA%A4%E6%B5%81%E7%A8%8B/">Flink 任务提交流程中</a> 提到在 Flink Client 端会运行我们编写代码中的 main() 方法，然后生成 JobGraph，再将 JobGraph 提交到 Flink Cluster。</p>
+<p>说起 Graph，自然而然就想到了 Spark 的 DAG（Directed Acyclic Graph，有向无环图），DAG 中包含顶点和边。Spark 的 RDD 就是根据这个 DAG 进行流转计算，DAG 不仅可以帮助 Spark 进行一些计算的优化，还可以进行容错恢复。Flink 也有类似的设计，只不过不叫 DAG，而是叫 DataFlow Graph，叫什么不重要，重要的是理解其概念和原理。</p>
+<p>Flink 的执行图分为下面四层，StreamGraph -&gt; JobGraph -&gt; ExecutionGraph -&gt; 物理执行图，每层都是从上一层转换优化而来。</p>
+<p>StreamGraph：最初始的图，是根据我们用 DataStream API 编写的代码转换而来</p>
+<p>JobGraph：对 StreamGraph 进行优化（Operator Chain）得到</p>
+<p>ExecutionGraph：在 Flink Cluster 中 JobManager 根据 JobGraph 并行化处理得到</p>
+<p>物理执行图：JobManager 根据 ExecutionGraph 对 Job 进行调度后，在各个TaskManager 上部署 Task 后形成的“图”，并不是一个具体的数据结构。</p>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201101909241.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201101909241.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="img"></p>
+<p>为什么要这四张图，我理解的是为了屏蔽上层差异，并且层与层之间进行解耦，Flink 支持流和批处理，但是其 API 是不一样的，流处理使用 DataStream API；批处理使用 DataSet API。</p>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201101916586.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201101916586.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="img"></p>
+<p>上图中 DataStream API 先转换成 StreamGraph 在转成 JobGraph；DataSet API 先转换成 OptimizedPlan 再转成 JobGraph，为啥不直接转成 JobGraph 呢？因为针对批处理在执行前可以做很多预分析用来优化图的执行，但是这些优化并不能用于流处理。所有就有了 StreamGraph 和 OptimizedPlan 进行过度。</p>
+<p>而 JobGraph 则统一了 StreamGraph 和 OptimizedPlan，并进行了适用两者（流与批）的优化（Opertor Chain），再下层的 ExecutionGraph 是 JobGraph 的并行化版本，最下层的物理执行图则是实际运行在 TaskManager 中 Task 组成的“图”。</p>
+<hr>
+<p>我们目前只关注 Flink 的流处理部分，所有先来看看 StreamGraph 是怎么生成的，不过在聊 StreamGraph 之前需要先了解几个概念</p>
+<h4 id="DataStream"><a href="#DataStream" class="headerlink" title="DataStream"></a>DataStream</h4><p>下面引用代码中的注释</p>
+<blockquote>
+<p>A DataStream represents a stream of elements of the same type. A DataStream can be transformed into another DataStream by applying a transformation as for example:</p>
+<ul>
+<li>map</li>
+<li>filter</li>
+</ul>
+</blockquote>
+<p>DataStream 是对相同类型的元素流进行封装，并且可以通过 Transformation 转换成其它 DataStream，目前 DataStream 有下图这些实现，SingleOutPutStreamOperator（类名起得有点问题，容易和之后的 StreamOperator 混淆）、KeyedStream、IterativeStream、DataStreamSource。</p>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201101947475.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201101947475.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220110194720404"></p>
+<h4 id="Transformation"><a href="#Transformation" class="headerlink" title="Transformation"></a>Transformation</h4><p>DataStream 是面向用户的，以简化数据处理，而 Transformation 是面向 Flink 内核的。调用 DataStream API 数据处理流水线都会转换为 Transformation 流水线，如下图所示</p>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111030260.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111030260.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220111103015170"></p>
+<p>Transformation 主要分为两类：物理 Transformation(PhysicalTransformation) 和虚拟 Transformation，<strong>DataStream API 的调用都会转换为 Transformation，然后从 Transformation 转换为实际运行的算子</strong>，而虚拟的 Transformation 则不会转换成实际的算子。如 Reblance、Union、Split、Select 就不会转换成实际算子。</p>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111045914.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111045914.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220111104522845"></p>
+<p>下图仅仅是一部份 Transformation，详细请见 <a target="_blank" rel="noopener" href="https://nightlies.apache.org/flink/flink-docs-release-1.14/docs/dev/datastream/operators/overview/#datastream-transformations">DataStream Transformations</a></p>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111039187.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111039187.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220111103917125"></p>
+<p>Trasformation 抽象类是最顶层的抽象，所有物理 Transformation 均继承 PhysicalTransformation，其它虚拟 Transformation 均继承 Transformation 抽象类。</p>
+<p>Transformation 中定义了下面这些比较重要的属性：</p>
+<ul>
+<li>id：一个累加 id</li>
+<li>name：Transformation 的名称，主要用于可视化</li>
+<li>uid：用户指定的 id，主要用来在任务重启的时候可以再次分配与之前相同的 uid，以持久保存状态</li>
+<li>parallelism：并行度</li>
+<li>outputType：输出类型，主要用于序列化数据</li>
+</ul>
+<p>PhysicalTransformation 主要可以分为四类：</p>
+<ul>
+<li><p>SourceTransformation：读取数据源的 Transformation，这个 Transformation 没有上游，只有下游，是 Flink 作业的起点，一个 Flink 作业可以有多个 SourceTransformation，从多个数据源读取数据，如多流 Join、维表 Join、BroadcastState 等场景</p>
+</li>
+<li><p>SinkTransformation：输出数据的 Transformation，只有上游，下游就是外部系统，如 HDFS、Kafka 等，是 Flink 作业的终点。一个作业可以有多个 SinkTransformation，可以输出到不同的外部系统</p>
+</li>
+<li><p>OneInputTransformation：单流输入的 Transformation，构造器与 SinkTransformation 相同，都需要 input 和 operator。</p>
+</li>
+<li><p>TwoInputTransformation：双流输入的 Transformation，有两个输入流。</p>
+<p>  <img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111940504.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111940504.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220111194053430"></p>
+</li>
+</ul>
+<p>虚拟 Transformation，下面介绍几个比较常见的虚拟 Transformation:</p>
+<ul>
+<li><p>SideOutputTransformation：旁路输出 Transformation，表示上游的一个分支，上游可以有多个下游 SideOutputTransformation</p>
+<p>  <img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111944821.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111944821.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220111194428773"></p>
+</li>
+<li><p>UnionTransformation：主要用于合并多个流</p>
+<p>  <img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111946810.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111946810.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220111194602771"></p>
+</li>
+<li><p>PartitionTransformation：用于改变输入元素的分区，工作时除了提供一个StreamTransformation作为输入外，还需要提供一个StreamPartitioner的实例来进行分区。</p>
+</li>
+</ul>
+<p>说了这么多还是没搞明白 Transformation 到底是什么，可能单说 Transformation 不好理解，那看看下面这张图是不是会好理解些。</p>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111950208.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201111950208.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220111195008165"></p>
+<p>我们从最里层看，也就是 MapFunction，这里就是 UDF(user defined function) 我们编写的一些函数实现，如 Map、Filter 实现等等，然后就是对 UDF 进行封装的 StreamOperator 层，StreamOperator 是对 UDF 的一层封装，在 StreamOperator 中定义了 UDF 的生命周期，然后最下层就是 Transformation 了，Transformation 是对 StreamOperator 的封装。每个 Transformation 都会记录其前一个 Transformation，因此就形成了一个 Transformation 链。</p>
+<h4 id="StreamOperator"><a href="#StreamOperator" class="headerlink" title="StreamOperator"></a>StreamOperator</h4><p>算子在 Flink 流处理中叫 StreamOperator，每个 Task 有一个或者多个算子，每个算子代表一个计算步骤，具体的计算逻辑由封装的 Function 来实现，StreamOperator 还定义了算子的生命周期，下面来看下其接口代码</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// org.apache.flink.streaming.api.operators.StreamOperator</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">StreamOperator</span>&lt;<span class="title">OUT</span>&gt; <span class="keyword">extends</span> <span class="title">CheckpointListener</span>, <span class="title">KeyContext</span>, <span class="title">Serializable</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// ------------------------------------------------------------------------</span></span><br><span class="line">    <span class="comment">//  life cycle</span></span><br><span class="line">    <span class="comment">// ------------------------------------------------------------------------</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">open</span><span class="params">()</span> <span class="keyword">throws</span> Exception</span>;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">finish</span><span class="params">()</span> <span class="keyword">throws</span> Exception</span>;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">close</span><span class="params">()</span> <span class="keyword">throws</span> Exception</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// ------------------------------------------------------------------------</span></span><br><span class="line">    <span class="comment">//  state snapshots</span></span><br><span class="line">    <span class="comment">// ------------------------------------------------------------------------</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">prepareSnapshotPreBarrier</span><span class="params">(<span class="keyword">long</span> checkpointId)</span> <span class="keyword">throws</span> Exception</span>;</span><br><span class="line"></span><br><span class="line">    </span><br><span class="line">    <span class="function">OperatorSnapshotFutures <span class="title">snapshotState</span><span class="params">(</span></span></span><br><span class="line"><span class="params"><span class="function">            <span class="keyword">long</span> checkpointId,</span></span></span><br><span class="line"><span class="params"><span class="function">            <span class="keyword">long</span> timestamp,</span></span></span><br><span class="line"><span class="params"><span class="function">            CheckpointOptions checkpointOptions,</span></span></span><br><span class="line"><span class="params"><span class="function">            CheckpointStreamFactory storageLocation)</span></span></span><br><span class="line"><span class="function">            <span class="keyword">throws</span> Exception</span>;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">initializeState</span><span class="params">(StreamTaskStateInitializer streamTaskStateManager)</span> <span class="keyword">throws</span> Exception</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// ------------------------------------------------------------------------</span></span><br><span class="line">    <span class="comment">//  miscellaneous</span></span><br><span class="line">    <span class="comment">// ------------------------------------------------------------------------</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">setKeyContextElement1</span><span class="params">(StreamRecord&lt;?&gt; record)</span> <span class="keyword">throws</span> Exception</span>;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">setKeyContextElement2</span><span class="params">(StreamRecord&lt;?&gt; record)</span> <span class="keyword">throws</span> Exception</span>;</span><br><span class="line"></span><br><span class="line">    <span class="function">OperatorMetricGroup <span class="title">getMetricGroup</span><span class="params">()</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="function">OperatorID <span class="title">getOperatorID</span><span class="params">()</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>下面是几个比较关键的抽象类和接口</p>
+<ul>
+<li><p>AbstractStreamOperator：所有 Stream Operator 的基类，定义了一些配置、运行时参数、kv state 操作等等</p>
+</li>
+<li><p>AbstactUdfStreamOperator：封装一个 UDF，但是主要操作都是交给 UDF 操作，如 open、close 等</p>
+</li>
+<li><p>OneInputStreamOperator：表示只有一个输入的流，实现这个接口需要实现一个 processElemnet() 方法，并在其中实现处理逻辑，map、FlatMap、Filter 等等都实现了这个接口</p>
+</li>
+<li><p>TwoInputStreamOperator：两个输入的流，实现这个接口需要实现一个 processElemnet1() 和 processElemnet2() 方法，并在其中实现处理逻辑，双流 Join 操作就是实现这个接口</p>
+</li>
+<li><p>MultipeInputStreamOperator：多输入流，OneInputStreamOperator 的 List 版本。</p>
+</li>
+</ul>
+<p>Flink 算子的设计分为两条线，与数据处理相关的主要由 OneInputStreamOperator 和 TwoInputStreamOperator 接口定义；与生命周期、状态处理相关的由 AbstractStreamOperator 抽象类定义实现，AbstractStreamOperator 还定义了算子融合策略 ChainingStrategy，之后的文章会提到。</p>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201102339134.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201102339134.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220110233943074"></p>
+<p>StreamOperator 基本上与 DataStream API 相对应，例如，map 对应 StreamMap、flatMap 对应 StreamFlatMap、filter 对应 StreamFilter 等等。StreamOperator 大致也可以分为四类：</p>
+<ul>
+<li>单流输入算子</li>
+<li>双流输入算子</li>
+<li>数据源算子</li>
+<li>异步算子</li>
+</ul>
+<p>重点解释下异步算子，异步算子主要是解决同步调用外部系统等待导致系统吞吐量降低的问题。下图展示同步算子和异步算子的区别</p>
+<p><img src="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/202112262149857.svg" class="lazy" data-srcset="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/202112262149857.svg" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="img"></p>
+<p>既然是异步调用，那就有调用请求返回先后的顺序，比如后调用的请求先返回，那此时这个元素输出还是需要等其前面的元素处理完再输出？Flink 定义了两种输出模式：</p>
+<ul>
+<li><p>顺序输出模式：</p>
+<p>  先收到的数据元素先输出，后续数据元素的异步函数调用无论是否先完成，都需要等待。顺序输出模式可以保证消息不乱序，但是可能增加延迟、降低算子的吞吐量</p>
+<p>  <img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112016515.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112016515.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220111201610445"></p>
+</li>
+<li><p>无序输出模式：</p>
+<p>  简单来讲，就是先处理完的数据元素先输出，不保证消息顺序，相比顺序模式，无序输出模式算子延迟低、吞吐量更高。无序输出并不是完全无序的，其按照 Watermark 进行分组，保证组内无序，组间严格有序。也就是在 Watermark 之后的元素请求完成了也要等 Watermark 前面的元素处理完了才能输出。</p>
+<p>  <img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112016345.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112016345.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220111201658279"></p>
+</li>
+</ul>
+<h4 id="Funciton"><a href="#Funciton" class="headerlink" title="Funciton"></a>Funciton</h4><p>函数在 Flink 中就叫 Function，我们自己编写函数叫 UDF（User Defined Function），Flink 内置了一些预定义可供我们直接使用的 UDF，如 sum、max、join 等等。按照输入输出可以将函数分为以下三类：</p>
+<ul>
+<li>SourceFunction：数据源函数，没有上游 Function，一般直接从外部系统读取数据。</li>
+<li>SinkFunction：数据汇函数，没有下游 Function，一般将数据直接写入外部系统。</li>
+<li>一般函数：处于整个函数链中间的函数，有上游也有下游。</li>
+</ul>
+<p>函数的层次：</p>
+<p>UDF 一般在 DataStream API 使用，从 Flink 提供的函数体系接口来看，可以按下图层级分层：</p>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112304987.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112304987.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220111230423919"></p>
+<p><strong>无状态函数</strong></p>
+<p>我们常用的 DataStream#map、DataStream#faltMap、DataStream#filter 都是高阶函数，我们使用高阶函数的时候无须关系触发器等底层特性，只需关注函数逻辑即可。无状态函数用来做无状态计算，比较简单，如 MapFunction，无状态函数与 RichFunction 是一一对应的，如 MapFunction 和 RichMapFunction。我们使用状态函数时只需要实现对应的无状态接口或者通过匿名函数的方式实现其逻辑即可。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 实现接口方式</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">MyMapFunction</span> <span class="keyword">implements</span> <span class="title">MapFunction</span>&lt;<span class="title">String</span>, <span class="title">String</span>&gt; </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">map</span><span class="params">(String value)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 匿名函数方式</span></span><br><span class="line">dataStream.map(<span class="keyword">new</span> MapFunction&lt;String, String&gt;() &#123;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">map</span><span class="params">(String value)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p><strong>RichFunction</strong></p>
+<p>RichFunction 相较于无状态函数，增加了两个特性：</p>
+<ul>
+<li>增加了生命周期管理，增加了 open()、close() 方法。在作业启动时，Function在open方法中执行初始化，在Function停止时，在close方法中执行清理，释放占用的资源等。无状态Function不具备此能力。</li>
+<li>增加了 getRuntimeContext() 和 setRuntimeContext()，通过 RuntimeContext 可以获取执行时作业级别的的参数信息。</li>
+</ul>
+<p>无状态函数天然就时容错的，作业失败之后重新执行即可。但是有状态函数 RichFunction 需要处理中间结果和状态的保存，持有了访问状态的能力，待故障重启后只需要从失败前保存的状态中恢复即可。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// org.apache.flink.api.common.functions.AbstractRichFunction</span></span><br><span class="line"><span class="comment">// 函数已删减</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">AbstractRichFunction</span> <span class="keyword">implements</span> <span class="title">RichFunction</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// --------------------------------------------------------------------------------------------</span></span><br><span class="line">    <span class="comment">//  Runtime context access</span></span><br><span class="line">    <span class="comment">// --------------------------------------------------------------------------------------------</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">transient</span> RuntimeContext runtimeContext;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">setRuntimeContext</span><span class="params">(RuntimeContext t)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">this</span>.runtimeContext = t;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> RuntimeContext <span class="title">getRuntimeContext</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">this</span>.runtimeContext != <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">this</span>.runtimeContext;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> IllegalStateException(<span class="string">&quot;The runtime context has not been initialized.&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> IterationRuntimeContext <span class="title">getIterationRuntimeContext</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">this</span>.runtimeContext == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> IllegalStateException(<span class="string">&quot;The runtime context has not been initialized.&quot;</span>);</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (<span class="keyword">this</span>.runtimeContext <span class="keyword">instanceof</span> IterationRuntimeContext) &#123;</span><br><span class="line">            <span class="keyword">return</span> (IterationRuntimeContext) <span class="keyword">this</span>.runtimeContext;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> IllegalStateException(<span class="string">&quot;This stub is not part of an iteration step function.&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// --------------------------------------------------------------------------------------------</span></span><br><span class="line">    <span class="comment">//  Default life cycle methods</span></span><br><span class="line">    <span class="comment">// --------------------------------------------------------------------------------------------</span></span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">open</span><span class="params">(Configuration parameters)</span> <span class="keyword">throws</span> Exception </span>&#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">close</span><span class="params">()</span> <span class="keyword">throws</span> Exception </span>&#123;&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<p><strong>处理函数</strong></p>
+<p>处理函数 ProcessFunction 可以访问流处理应用的所有基本组件：</p>
+<ul>
+<li>事件：数据流中的元素</li>
+<li>状态</li>
+<li>定时器</li>
+</ul>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112325615.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112325615.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220111232544527"></p>
+<p>KeyedProcessFunction 与 Non-Keyed ProcessFunction 的区别是 KeyedProcessFunction 只能作用在 KeyedStream 上；ProcessFunction 与 CoProcessFunction 的区别就是 CoProcessFunction 是双流输入，ProcessFunction 是单流输入。出了输入函数还有广播函数、异步函数、数据源函数、数据汇（输出）函数，就不一一解释了，感兴趣的朋友可以自行去看下代码和接口实现结构</p>
+<p>广播函数</p>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112340996.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112340996.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220111234041928"></p>
+<p>异步函数</p>
+<p><img src="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112342572.png" class="lazy" data-srcset="https://raw.githubusercontent.com/Liyajun595/notes-image/master/img/202201112342572.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="image-20220111234208504"></p>
+<p>总结：</p>
+<p>本来这篇是将 StreamGraph 的生成流程的，但是还是先把一些前置的概念弄清楚。本篇介绍了 Flink 的四层 Graph 的区别以及为什么要分层设计 Graph，然后讲到了 DataStream、Transformation、StreamOperator、Function 等概念。了解到 DataStream API 是面向用户的，而 Transformation 是面向 Flink 内核的。然后讲了 Transformation -&gt; StreamOperator -&gt; Function 的封装层级。最后提到了 Flink 的函数体系从高阶到低阶的过程，无状态Function -&gt; RichFunction -&gt; ProcessFunction。</p>
+
+    </div>
+     
+    <div class="post-footer__meta"><p>updated at 2022-03-04</p></div> 
+    <div class="post-entry__tags"><a href="/tags/Flink/" class="post-tags__link button"># Flink</a><a href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="post-tags__link button"># 大数据</a><a href="/tags/%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/" class="post-tags__link button"># 源码分析</a></div> 
+</article>
+
+
+    <div class="nav">
+        <div class="nav__prev">
+            
+                <a href="/2022/01/22/Flink%20StreamGraph%20%E7%94%9F%E6%88%90%E8%BF%87%E7%A8%8B/" class="nav__link">
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M589.088 790.624L310.464 512l278.624-278.624 45.248 45.248L400.96 512l233.376 233.376z" fill="#808080"></path></svg>
+                    </div>
+                    <div>
+                        <div class="nav__label">
+                            Previous Post
+                        </div>
+                        <div class="nav__title">
+                            Flink-1.14 源码分析--StreamGraph 生成过程
+                        </div>
+                    </div>
+                </a>
+            
+        </div>
+        <div class="nav__next">
+            
+                <a href="/2022/01/09/Flink%20%E4%BB%BB%E5%8A%A1%E6%8F%90%E4%BA%A4%E6%B5%81%E7%A8%8B/" class="nav__link">
+                    <div>
+                        <div class="nav__label">
+                            Next Post
+                        </div>
+                        <div class="nav__title">
+                            Flink-1.14 源码分析--任务提交流程
+                        </div>
+                    </div>
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M434.944 790.624l-45.248-45.248L623.04 512l-233.376-233.376 45.248-45.248L713.568 512z" fill="#808080"></path></svg>
+                    </div>
+                </a>
+            
+        </div>
+    </div>
+
+
+
+    <div class="post__comments content-card" id="comment">
+        
+    <h4>Comments</h4>
+    
+    
+    
+    
+    
+    <div id="gitalk-container"></div>
+
+    
+    
+    
+    
+    
+    
+
+
+    </div>
+
+
+
+</main>
+
+            <footer class="footer">
+     
+    <a href="#" class="button" id="b2t" aria-label="Back to Top" title="Back to Top">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="32" height="32">
+            <path d="M233.376 722.752L278.624 768 512 534.624 745.376 768l45.248-45.248L512 444.128zM192 352h640V288H192z" fill="currentColor"></path>
+        </svg>
+    </a>
+
+    
+
+
+    
+    
+    
+        <span id="busuanzi_container_site_uv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_uv"></span>
+            <span>Viewers</span>
+            
+                <span>|</span>
+            
+        </span>
+    
+    
+        <span id="busuanzi_container_site_pv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_pv"></span>
+            <span>Views</span>
+            
+        </span>
+    
+ 
+ 
+
+ 
+    
+        
+        <p class="footer-copyright">
+            Copyright © 2022 <a href="/">大白</a>
+        </p>
+    
+    
+    <p>Powered by <a href="https://hexo.io" target="_blank">Hexo</a> | Theme - <a href="https://github.com/ChrAlpha/hexo-theme-cards" target="_blank">Cards</a></p>
+</footer>
+
+        </div>
+        
+    <script defer src="https://cdn.jsdelivr.net/npm/vanilla-lazyload@17.1.0/dist/lazyload.min.js"></script>
+    <script>
+        window.lazyLoadOptions = {
+            elements_selector: ".lazy",
+            threshold: 0
+        };
+    </script>
+ 
+
+ 
+    <script>
+        window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+        ga('create', 'UA-178473615-1', 'auto');
+        ga('send', 'pageview');
+    </script>
+    <script async src="https://www.google-analytics.com/analytics.js"></script>
+ 
+
+ 
+
+ 
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement('script');
+            hm.src = 'https://hm.baidu.com/hm.js?fb2dded415192023dd108d2b441862de';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+ 
+
+ 
+
+
+
+ 
+
+
+
+ 
+
+
+    
+ 
+
+
+    
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.4.1/dist/jquery.min.js"></script>
+
+    
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.css">
+
+    
+<script src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.js"></script>
+
+    <script>
+        let lazyloadT = Boolean('true'),
+            auto_fancybox = Boolean('true')
+        if (auto_fancybox) {
+            $(".post__content").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        } else {
+            $(".post__content").find("fancybox").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        }
+    </script>
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+    
+
+    
+    
+    
+
+    
+    
+    
+    <script>
+        function loadComment() {
+            let e, i;
+            (e = document.createElement("script")).src = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js',
+            document.body.appendChild(e);
+            e.onload = () => {
+                var gitalk = new Gitalk({
+                    clientID: '5343251f7191333c2cf8',
+                    clientSecret: 'c0471f2aaeafdec2f9ad0edfd4df7404db114101',
+                    repo: 'big-white-2020.github.io',
+                    owner: 'big-white-2020',
+                    admin: 'big-white-2020',
+                    id: window.location.pathname,
+                    distractionFreeMode: false
+                });
+                gitalk.render('gitalk-container');
+            };
+            (i = document.createElement("link")).rel = "stylesheet",
+            i.href = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css',
+            document.head.appendChild(i);
+        }
+    
+        var runningOnBrowser = typeof window !== "undefined";
+        var isBot = runningOnBrowser && !("onscroll" in window) || typeof navigator !== "undefined" && /(gle|ing|ro|msn)bot|crawl|spider|yand|duckgo/i.test(navigator.userAgent);
+        var supportsIntersectionObserver = runningOnBrowser && "IntersectionObserver" in window;
+    
+        setTimeout(function () {
+            if (!isBot && supportsIntersectionObserver) {
+                var comment_observer = new IntersectionObserver(function(entries) {
+                    if (entries[0].isIntersecting) {
+                        loadComment();
+                        comment_observer.disconnect();
+                    }
+                }, { threshold: [0] });
+                comment_observer.observe(document.getElementById('comment'));
+            } else {
+                loadComment();
+            }
+        }, 1);
+    </script>
+
+    
+    
+
+    
+    
+    
+    
+    
+
+    
+    
+    
+
+
+
+    </body>
+</html>

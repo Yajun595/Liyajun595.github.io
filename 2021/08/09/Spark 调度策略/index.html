@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    <meta charset="utf-8">
+
+    
+
+    <!-- 渲染优化 -->
+    <meta name="renderer" content="webkit">
+    <meta name="force-rendering" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+    <meta name="HandheldFriendly" content="True" >
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+    <!--icon-->
+
+    
+    
+        <link rel="icon" type="image/png" sizes="16x16" href="/function%20small()%20%7B%20%5Bnative%20code%5D%20%7D">
+    
+    
+    
+    
+
+
+    <!-- meta -->
+
+
+<title>Spark 调度策略 | 大白</title>
+
+
+    <meta name="keywords" content="大数据, Spark">
+
+
+
+
+    <!-- OpenGraph -->
+ 
+    <meta name="description" content="概览Spark 的调度有两层，一是 Spark 应用间的调度，即不同 SparkContext 间的调度，这层的调度主要由  YARN 负责，就不过多赘述；二是 Spark 应用内 Task 级别的调度，即相同 SparkContext 间的调度，主要分析的重点。 Spark 应用内的调度有两种模式：FIFO(先进先出队列)、FAIR(公平队列)  FIFO   FAIR  默认使用 FIFO 调">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark 调度策略">
+<meta property="og:url" content="http://example.com/2021/08/09/Spark%20%E8%B0%83%E5%BA%A6%E7%AD%96%E7%95%A5/index.html">
+<meta property="og:site_name" content="大白">
+<meta property="og:description" content="概览Spark 的调度有两层，一是 Spark 应用间的调度，即不同 SparkContext 间的调度，这层的调度主要由  YARN 负责，就不过多赘述；二是 Spark 应用内 Task 级别的调度，即相同 SparkContext 间的调度，主要分析的重点。 Spark 应用内的调度有两种模式：FIFO(先进先出队列)、FAIR(公平队列)  FIFO   FAIR  默认使用 FIFO 调">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/2021/08/09/23e7cf31241763aa209ea85f26b32c96-m3px2240hs-af7d87.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/2021/08/09/fea961548a0c24af9109b22867f5b5d5-gq0p4awrj2-056f58.png">
+<meta property="article:published_time" content="2021-08-09T12:56:50.000Z">
+<meta property="article:modified_time" content="2022-03-03T16:55:34.473Z">
+<meta property="article:author" content="yajun Li">
+<meta property="article:tag" content="大数据">
+<meta property="article:tag" content="Spark">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/2021/08/09/23e7cf31241763aa209ea85f26b32c96-m3px2240hs-af7d87.png">
+
+
+    
+<link rel="stylesheet" href="/css/style/main.css">
+ 
+
+    
+    
+        <link rel="stylesheet" id="hl-default-theme" href="/css/highlight/github.css" media="none" >
+        
+    
+
+    
+    
+
+    
+    
+<link rel="stylesheet" href="/css/style/dark.css">
+
+    
+<script src="/js/darkmode.js"></script>
+
+
+
+     
+    <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+ 
+
+    <!-- custom head -->
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+    <body>
+        <div id="app">
+            <header class="header">
+    <div class="header__left">
+        <a href="/" class="button">
+            <span class="logo__text">大白</span>
+        </a>
+    </div>
+    <div class="header__right">
+        
+            <div class="navbar__menus">
+                
+                    <a href="/" class="navbar-menu button">首页</a>
+                
+                    <a href="/tags/" class="navbar-menu button">标签</a>
+                
+                    <a href="/archives/" class="navbar-menu button">归档</a>
+                
+            </div>
+        
+        
+        
+    <a href="/search/" id="btn-search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="24" height="24" fill="currentColor" stroke="currentColor" stroke-width="32"><path d="M192 448c0-141.152 114.848-256 256-256s256 114.848 256 256-114.848 256-256 256-256-114.848-256-256z m710.624 409.376l-206.88-206.88A318.784 318.784 0 0 0 768 448c0-176.736-143.264-320-320-320S128 271.264 128 448s143.264 320 320 320a318.784 318.784 0 0 0 202.496-72.256l206.88 206.88 45.248-45.248z"></path></svg>
+    </a>
+
+
+        
+        
+    <a href="javaScript:void(0);" id="btn-toggle-dark">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </a>
+
+
+        
+            <a class="dropdown-icon button" id="btn-dropdown" tabindex="0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width='24' height='24' fill="none" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round"><path fill="currentColor" d="M3.314,4.8h13.372c0.41,0,0.743-0.333,0.743-0.743c0-0.41-0.333-0.743-0.743-0.743H3.314c-0.41,0-0.743,0.333-0.743,0.743C2.571,4.467,2.904,4.8,3.314,4.8z M16.686,15.2H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,15.2,16.686,15.2z M16.686,9.257H3.314c-0.41,0-0.743,0.333-0.743,0.743s0.333,0.743,0.743,0.743h13.372c0.41,0,0.743-0.333,0.743-0.743S17.096,9.257,16.686,9.257z"></path></svg></a>
+            <div class="dropdown-menus" id="dropdown-menus">
+                
+                    <a href="/" class="dropdown-menu button">首页</a>
+                
+                    <a href="/tags/" class="dropdown-menu button">标签</a>
+                
+                    <a href="/archives/" class="dropdown-menu button">归档</a>
+                
+            </div>
+        
+    </div>
+</header>
+
+
+            <main class="main">
+    
+
+<div class="post-title">
+    <h1 class="post-title__text">
+        Spark 调度策略
+    </h1>
+    <div class="post-title__meta">
+        <a href="/archives/2021/08/" class="post-meta__date button">2021-08-09</a>
+        
+ 
+        
+    
+     
+    <span id="busuanzi_container_page_pv" hidden>
+        <span class="separate-dot"></span>
+        <span></span>
+        <span id="busuanzi_value_page_pv"></span>
+        <span>Views</span>
+    </span>
+
+
+
+ 
+
+ 
+		| 本篇文章共<span class="post-count">1.5k字</span>，预计阅读<span class="post-count">7分钟</span>
+    </div>
+</div>
+
+
+
+<article class="post content-card">
+    <div class="post__header"></div>
+    <div class="post__content">
+        <h3 id="概览"><a href="#概览" class="headerlink" title="概览"></a>概览</h3><p>Spark 的调度有两层，一是 Spark 应用间的调度，即不同 <code>SparkContext</code> 间的调度，这层的调度主要由  <code>YARN</code> 负责，就不过多赘述；二是 Spark 应用内 Task 级别的调度，即相同 <code>SparkContext</code> 间的调度，主要分析的重点。</p>
+<p>Spark 应用内的调度有两种模式：<code>FIFO</code>(先进先出队列)、<code>FAIR</code>(公平队列)</p>
+<p><img src="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/2021/08/09/23e7cf31241763aa209ea85f26b32c96-m3px2240hs-af7d87.png" class="lazy" data-srcset="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/2021/08/09/23e7cf31241763aa209ea85f26b32c96-m3px2240hs-af7d87.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="m3px2240hs"></p>
+<center>FIFO</center>
+
+<p><img src="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/2021/08/09/fea961548a0c24af9109b22867f5b5d5-gq0p4awrj2-056f58.png" class="lazy" data-srcset="https://raw.githubusercontent.com/big-white-2020/notes-image/master/img/2021/08/09/fea961548a0c24af9109b22867f5b5d5-gq0p4awrj2-056f58.png" srcset="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAABlBMVEXMzMyWlpYU2uzLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNgAAAAAgAB9HFkpgAAAABJRU5ErkJggg==" alt="gq0p4awrj2"></p>
+<center>FAIR</center>
+
+<p>默认使用 FIFO 调度，所以，如果想要使用 FAIR 调度，需要通过 <code>spark.scheduler.mode</code> 参数进行显示指定</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">val</span> conf = <span class="keyword">new</span> <span class="type">SparkConf</span>().setMaster(...).setAppName(...)</span><br><span class="line">conf.set(<span class="string">&quot;spark.scheduler.mode&quot;</span>, <span class="string">&quot;FAIR&quot;</span>)</span><br><span class="line"><span class="keyword">val</span> sc = <span class="keyword">new</span> <span class="type">SparkContext</span>(conf)</span><br></pre></td></tr></table></figure>
+
+<p>或者提交任务时指定。</p>
+<p>Spark 在初始化 <code>TaskScheduler</code> 时就会根据调度模式创建不同的 <code>ScheduleBuilder</code></p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// org.apache.spark.scheduler.TaskSchedulerImpl#initialize</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">initialize</span></span>(backend: <span class="type">SchedulerBackend</span>): <span class="type">Unit</span> = &#123;</span><br><span class="line">    <span class="keyword">this</span>.backend = backend</span><br><span class="line">    schedulableBuilder = &#123;</span><br><span class="line">      schedulingMode <span class="keyword">match</span> &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="type">SchedulingMode</span>.<span class="type">FIFO</span> =&gt;</span><br><span class="line">          <span class="keyword">new</span> <span class="type">FIFOSchedulableBuilder</span>(rootPool)</span><br><span class="line">        <span class="keyword">case</span> <span class="type">SchedulingMode</span>.<span class="type">FAIR</span> =&gt;</span><br><span class="line">          <span class="keyword">new</span> <span class="type">FairSchedulableBuilder</span>(rootPool, conf)</span><br><span class="line">        <span class="keyword">case</span> _ =&gt;</span><br><span class="line">          <span class="keyword">throw</span> <span class="keyword">new</span> <span class="type">IllegalArgumentException</span>(<span class="string">s&quot;Unsupported <span class="subst">$SCHEDULER_MODE_PROPERTY</span>: &quot;</span> +</span><br><span class="line">          <span class="string">s&quot;<span class="subst">$schedulingMode</span>&quot;</span>)</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    schedulableBuilder.buildPools()</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h3 id="FIFO"><a href="#FIFO" class="headerlink" title="FIFO"></a>FIFO</h3><p>因为 <code>FIFOSchedulableBuilder</code> 只有一个队列，所以的实现比较简单，添加 <code>TaskSetManager</code> 只要直接添加即可</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[spark] <span class="class"><span class="keyword">class</span> <span class="title">FIFOSchedulableBuilder</span>(<span class="params">val rootPool: <span class="type">Pool</span></span>)</span></span><br><span class="line">  <span class="keyword">extends</span> <span class="type">SchedulableBuilder</span> <span class="keyword">with</span> <span class="type">Logging</span> &#123;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">buildPools</span></span>(): <span class="type">Unit</span> = &#123;</span><br><span class="line">    <span class="comment">// nothing</span></span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">addTaskSetManager</span></span>(manager: <span class="type">Schedulable</span>, properties: <span class="type">Properties</span>): <span class="type">Unit</span> = &#123;</span><br><span class="line">    rootPool.addSchedulable(manager)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="FIFO-调度算法"><a href="#FIFO-调度算法" class="headerlink" title="FIFO 调度算法"></a>FIFO 调度算法</h4><figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[spark] <span class="class"><span class="keyword">class</span> <span class="title">FIFOSchedulingAlgorithm</span> <span class="keyword">extends</span> <span class="title">SchedulingAlgorithm</span> </span>&#123;</span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">comparator</span></span>(s1: <span class="type">Schedulable</span>, s2: <span class="type">Schedulable</span>): <span class="type">Boolean</span> = &#123;</span><br><span class="line">      <span class="comment">// 根据优先级比较，这个优先级就是 jobId</span></span><br><span class="line">    <span class="keyword">val</span> priority1 = s1.priority</span><br><span class="line">    <span class="keyword">val</span> priority2 = s2.priority</span><br><span class="line">    <span class="keyword">var</span> res = math.signum(priority1 - priority2)</span><br><span class="line">    <span class="keyword">if</span> (res == <span class="number">0</span>) &#123;</span><br><span class="line">        </span><br><span class="line">        <span class="comment">// 如果 jobId 相同，则比较 stageId</span></span><br><span class="line">      <span class="keyword">val</span> stageId1 = s1.stageId</span><br><span class="line">      <span class="keyword">val</span> stageId2 = s2.stageId</span><br><span class="line">      res = math.signum(stageId1 - stageId2)</span><br><span class="line">    &#125;</span><br><span class="line">    res &lt; <span class="number">0</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>FIFO 调度主要是按照先进先出的顺序进行调度，流程为：</p>
+<ol>
+<li>比较 jobId，上面代码中的 priority，哪个 jobId 小，就先调度哪个，因为 jobId、stageId 都是递增的，小的肯定是先进入队列的。</li>
+<li>如果 jobId 相同，则比较 stageId，哪个 stageId 小，就先调度哪个</li>
+</ol>
+<hr>
+<h3 id="FAIR"><a href="#FAIR" class="headerlink" title="FAIR"></a>FAIR</h3><p><code>FairSchedulableBuilder</code> 的实现就比较复杂，根据上面 <code>FAIR</code> 的图可以看出，FAIR 调度方式有多个子队列。先来看看 FAIR 调度算法的两个关键参数：</p>
+<p><code>weight</code>：当前资源池相对于其他的资源池可以分配到的资源，默认都为 1。如果当前资源池的 <code>weight</code> 设置为 2，其他资源池为 1，那么当前资源池可以分配到的资源就是其他资源池的 2 倍。</p>
+<p><code>minShare</code>：每个资源池最小资源分配数（CPU核数），默认为 0。这个最小不是指初始化时就分配，而是在资源分配时优先满足未到达 <code>minShare</code> 的资源池，当所有 <code>minShare</code> 都达到后，再按照 <code>weight</code> 进行分配，这样能确保每个资源池都能获得一定量的资源池。</p>
+<p><code>weight</code> 和 <code>minShare</code> 通过在 <code>fairscheduler.xml</code> 中进行配置</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">allocations</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">pool</span> <span class="attr">name</span>=<span class="string">&quot;1&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">minShare</span>&gt;</span>2<span class="tag">&lt;/<span class="name">minShare</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">weight</span>&gt;</span>1<span class="tag">&lt;/<span class="name">weight</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">schedulingMode</span>&gt;</span>FIFO<span class="tag">&lt;/<span class="name">schedulingMode</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">pool</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">pool</span> <span class="attr">name</span>=<span class="string">&quot;2&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">minShare</span>&gt;</span>3<span class="tag">&lt;/<span class="name">minShare</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">weight</span>&gt;</span>1<span class="tag">&lt;/<span class="name">weight</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">schedulingMode</span>&gt;</span>FIFO<span class="tag">&lt;/<span class="name">schedulingMode</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">pool</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">pool</span> <span class="attr">name</span>=<span class="string">&quot;3&quot;</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">pool</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">allocations</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>fairscheduler.xml</code> 中的 <code>schedulingMode</code> 是指子队列的调度模式，不是 <code>rootPool</code> 的调度模式。</p>
+<p><code>FairSchedulableBuilder</code> 会根据 <code>fairscheduler.xml</code> 中配置的子队列初始化时加入到 <code>rootPool</code> 中。</p>
+<h4 id="初始化-Fair-Pool"><a href="#初始化-Fair-Pool" class="headerlink" title="初始化 Fair Pool"></a>初始化 Fair Pool</h4><figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">buildPools</span></span>(): <span class="type">Unit</span> = &#123;</span><br><span class="line">  <span class="keyword">var</span> fileData: <span class="type">Option</span>[(<span class="type">InputStream</span>, <span class="type">String</span>)] = <span class="type">None</span></span><br><span class="line">  <span class="keyword">try</span> &#123;</span><br><span class="line">      <span class="comment">// 可以指定子队列配置文件</span></span><br><span class="line">    fileData = schedulerAllocFile.map &#123; f =&gt;</span><br><span class="line">      <span class="keyword">val</span> fis = <span class="keyword">new</span> <span class="type">FileInputStream</span>(f)</span><br><span class="line">      <span class="type">Some</span>((fis, f))</span><br><span class="line">    &#125;.getOrElse &#123;</span><br><span class="line">      <span class="keyword">val</span> is = <span class="type">Utils</span>.getSparkClassLoader.getResourceAsStream(<span class="type">DEFAULT_SCHEDULER_FILE</span>)</span><br><span class="line">      <span class="keyword">if</span> (is != <span class="literal">null</span>) &#123;</span><br><span class="line">        <span class="type">Some</span>((is, <span class="type">DEFAULT_SCHEDULER_FILE</span>))</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="type">None</span></span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">      <span class="comment">// 解析 xml 并新建 pool 并添加到 rootPool</span></span><br><span class="line">    fileData.foreach &#123; <span class="keyword">case</span> (is, fileName) =&gt; buildFairSchedulerPool(is, fileName) &#125;</span><br><span class="line">  &#125; <span class="keyword">catch</span> &#123;</span><br><span class="line">    <span class="keyword">case</span> <span class="type">NonFatal</span>(t) =&gt;</span><br><span class="line">      <span class="keyword">val</span> defaultMessage = <span class="string">&quot;Error while building the fair scheduler pools&quot;</span></span><br><span class="line">      <span class="keyword">val</span> message = fileData.map &#123; <span class="keyword">case</span> (is, fileName) =&gt; <span class="string">s&quot;<span class="subst">$defaultMessage</span> from <span class="subst">$fileName</span>&quot;</span> &#125;</span><br><span class="line">        .getOrElse(defaultMessage)</span><br><span class="line">      logError(message, t)</span><br><span class="line">      <span class="keyword">throw</span> t</span><br><span class="line">  &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">    fileData.foreach &#123; <span class="keyword">case</span> (is, fileName) =&gt; is.close() &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 最后创建一个 `default` 队列加入到 rootPool 中</span></span><br><span class="line">  buildDefaultPool()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="Fair-Pool-添加-TaskSetManager"><a href="#Fair-Pool-添加-TaskSetManager" class="headerlink" title="Fair Pool 添加 TaskSetManager"></a>Fair Pool 添加 <code>TaskSetManager</code></h4><p>在添加 <code>TaskSetManager</code> 时会先判断是否传入子队列的名称，如果没有则使用默认队列（default）</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">addTaskSetManager</span></span>(manager: <span class="type">Schedulable</span>, properties: <span class="type">Properties</span>): <span class="type">Unit</span> = &#123;</span><br><span class="line">    <span class="comment">// 根据传入的队列名称判断是否有这个子队列，没有则使用默认队列</span></span><br><span class="line">    <span class="keyword">val</span> poolName = <span class="keyword">if</span> (properties != <span class="literal">null</span>) &#123;</span><br><span class="line">        properties.getProperty(<span class="type">FAIR_SCHEDULER_PROPERTIES</span>, <span class="type">DEFAULT_POOL_NAME</span>)</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="type">DEFAULT_POOL_NAME</span></span><br><span class="line">      &#125;</span><br><span class="line">    <span class="keyword">var</span> parentPool = rootPool.getSchedulableByName(poolName)</span><br><span class="line">    <span class="keyword">if</span> (parentPool == <span class="literal">null</span>) &#123;</span><br><span class="line">      parentPool = <span class="keyword">new</span> <span class="type">Pool</span>(poolName, <span class="type">DEFAULT_SCHEDULING_MODE</span>,</span><br><span class="line">        <span class="type">DEFAULT_MINIMUM_SHARE</span>, <span class="type">DEFAULT_WEIGHT</span>)</span><br><span class="line">      rootPool.addSchedulable(parentPool)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 添加到这个子队列中</span></span><br><span class="line">    parentPool.addSchedulable(manager)</span><br><span class="line">    logInfo(<span class="string">&quot;Added task set &quot;</span> + manager.name + <span class="string">&quot; tasks to pool &quot;</span> + poolName)</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="FAIR-调度算法"><a href="#FAIR-调度算法" class="headerlink" title="FAIR 调度算法"></a>FAIR 调度算法</h4><p>FAIR 调度算法要稍微复杂一点，说明一下 <code>runningTasks</code> 表示已经在使用的资源数。</p>
+<p>下面是 <code>FAIR</code> 调度算法代码：</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[spark] <span class="class"><span class="keyword">class</span> <span class="title">FairSchedulingAlgorithm</span> <span class="keyword">extends</span> <span class="title">SchedulingAlgorithm</span> </span>&#123;</span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">comparator</span></span>(s1: <span class="type">Schedulable</span>, s2: <span class="type">Schedulable</span>): <span class="type">Boolean</span> = &#123;</span><br><span class="line">    <span class="keyword">val</span> minShare1 = s1.minShare</span><br><span class="line">    <span class="keyword">val</span> minShare2 = s2.minShare</span><br><span class="line">    <span class="keyword">val</span> runningTasks1 = s1.runningTasks</span><br><span class="line">    <span class="keyword">val</span> runningTasks2 = s2.runningTasks</span><br><span class="line">    <span class="keyword">val</span> s1Needy = runningTasks1 &lt; minShare1</span><br><span class="line">    <span class="keyword">val</span> s2Needy = runningTasks2 &lt; minShare2</span><br><span class="line">    <span class="keyword">val</span> minShareRatio1 = runningTasks1.toDouble / math.max(minShare1, <span class="number">1.0</span>)</span><br><span class="line">    <span class="keyword">val</span> minShareRatio2 = runningTasks2.toDouble / math.max(minShare2, <span class="number">1.0</span>)</span><br><span class="line">    <span class="keyword">val</span> taskToWeightRatio1 = runningTasks1.toDouble / s1.weight.toDouble</span><br><span class="line">    <span class="keyword">val</span> taskToWeightRatio2 = runningTasks2.toDouble / s2.weight.toDouble</span><br><span class="line"></span><br><span class="line">    <span class="keyword">var</span> compare = <span class="number">0</span></span><br><span class="line">      <span class="comment">// 优先满足未达到 minShare 的资源池</span></span><br><span class="line">    <span class="keyword">if</span> (s1Needy &amp;&amp; !s2Needy) &#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (!s1Needy &amp;&amp; s2Needy) &#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (s1Needy &amp;&amp; s2Needy) &#123;</span><br><span class="line">        <span class="comment">// 都未满足 minShare，则按照 minShare 满足比例分配</span></span><br><span class="line">      compare = minShareRatio1.compareTo(minShareRatio2)</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// 都满足 minShare，按照 weight 比例分配</span></span><br><span class="line">      compare = taskToWeightRatio1.compareTo(taskToWeightRatio2)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (compare &lt; <span class="number">0</span>) &#123;</span><br><span class="line">      <span class="literal">true</span></span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (compare &gt; <span class="number">0</span>) &#123;</span><br><span class="line">      <span class="literal">false</span></span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// 如果以上情况都相同，就按照名字排序</span></span><br><span class="line">      s1.name &lt; s2.name</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>FAIR 判断的流程如下：</p>
+<ol>
+<li>判断 <code>minShare</code> 是否都满足，优先分配给未达到 <code>minShare</code> 的资源池</li>
+<li>如果 <code>minShare</code> 都未满足，按照 <code>runningTasks / minShare</code> 进行比较，哪个资源池比例小就分配给哪个资源池。</li>
+<li>如果 <code>minShare</code> 都满足，按照 <code>runnigTasks / weight</code> 进行比较，哪个资源池比例小就分配给哪个资源池。</li>
+<li>如果以上几种情况大小都相等，则按资源池名称字典序排序。</li>
+</ol>
+<hr>
+<h3 id="任务出队"><a href="#任务出队" class="headerlink" title="任务出队"></a>任务出队</h3><figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// org.apache.spark.scheduler.Pool#getSortedTaskSetQueue </span></span><br><span class="line"><span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">getSortedTaskSetQueue</span></span>: <span class="type">ArrayBuffer</span>[<span class="type">TaskSetManager</span>] = &#123;</span><br><span class="line">    <span class="keyword">val</span> sortedTaskSetQueue = <span class="keyword">new</span> <span class="type">ArrayBuffer</span>[<span class="type">TaskSetManager</span>]</span><br><span class="line">    <span class="comment">// 根据调度模式传入不同的算法进行排序</span></span><br><span class="line">    <span class="keyword">val</span> sortedSchedulableQueue = schedulableQueue.asScala.toSeq.sortWith(taskSetSchedulingAlgorithm.comparator)</span><br><span class="line">    <span class="keyword">for</span> (schedulable &lt;- sortedSchedulableQueue) &#123;</span><br><span class="line">      sortedTaskSetQueue ++= schedulable.getSortedTaskSetQueue</span><br><span class="line">    &#125;</span><br><span class="line">    sortedTaskSetQueue</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>schedulableQueue</code> 是 Pool 的存储队列，由 ConcurrentLinkedQueue 实现，还用 ConcurrentHashMap 维护了一个 <code>schedulableNameToSchedulable</code> 的映射</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">val</span> schedulableQueue = <span class="keyword">new</span> <span class="type">ConcurrentLinkedQueue</span>[<span class="type">Schedulable</span>]</span><br><span class="line"><span class="keyword">val</span> schedulableNameToSchedulable = <span class="keyword">new</span> <span class="type">ConcurrentHashMap</span>[<span class="type">String</span>, <span class="type">Schedulable</span>]</span><br></pre></td></tr></table></figure>
+
+
+    </div>
+     
+    <div class="post-footer__meta"><p>updated at 2022-03-04</p></div> 
+    <div class="post-entry__tags"><a href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="post-tags__link button"># 大数据</a><a href="/tags/Spark/" class="post-tags__link button"># Spark</a></div> 
+</article>
+
+
+    <div class="nav">
+        <div class="nav__prev">
+            
+                <a href="/2021/08/18/UML%E7%B1%BB%E5%9B%BE/" class="nav__link">
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M589.088 790.624L310.464 512l278.624-278.624 45.248 45.248L400.96 512l233.376 233.376z" fill="#808080"></path></svg>
+                    </div>
+                    <div>
+                        <div class="nav__label">
+                            Previous Post
+                        </div>
+                        <div class="nav__title">
+                            UML 类图
+                        </div>
+                    </div>
+                </a>
+            
+        </div>
+        <div class="nav__next">
+            
+                <a href="/2021/07/27/%E7%AD%96%E7%95%A5%E6%A8%A1%E5%BC%8F/" class="nav__link">
+                    <div>
+                        <div class="nav__label">
+                            Next Post
+                        </div>
+                        <div class="nav__title">
+                            策略模式
+                        </div>
+                    </div>
+                    <div>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M434.944 790.624l-45.248-45.248L623.04 512l-233.376-233.376 45.248-45.248L713.568 512z" fill="#808080"></path></svg>
+                    </div>
+                </a>
+            
+        </div>
+    </div>
+
+
+
+    <div class="post__comments content-card" id="comment">
+        
+    <h4>Comments</h4>
+    
+    
+    
+    
+    
+    <div id="gitalk-container"></div>
+
+    
+    
+    
+    
+    
+    
+
+
+    </div>
+
+
+
+</main>
+
+            <footer class="footer">
+     
+    <a href="#" class="button" id="b2t" aria-label="Back to Top" title="Back to Top">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="32" height="32">
+            <path d="M233.376 722.752L278.624 768 512 534.624 745.376 768l45.248-45.248L512 444.128zM192 352h640V288H192z" fill="currentColor"></path>
+        </svg>
+    </a>
+
+    
+
+
+    
+    
+    
+        <span id="busuanzi_container_site_uv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_uv"></span>
+            <span>Viewers</span>
+            
+                <span>|</span>
+            
+        </span>
+    
+    
+        <span id="busuanzi_container_site_pv" hidden>
+            <span></span>
+            <span id="busuanzi_value_site_pv"></span>
+            <span>Views</span>
+            
+        </span>
+    
+ 
+ 
+
+ 
+    
+        
+        <p class="footer-copyright">
+            Copyright © 2022 <a href="/">大白</a>
+        </p>
+    
+    
+    <p>Powered by <a href="https://hexo.io" target="_blank">Hexo</a> | Theme - <a href="https://github.com/ChrAlpha/hexo-theme-cards" target="_blank">Cards</a></p>
+</footer>
+
+        </div>
+        
+    <script defer src="https://cdn.jsdelivr.net/npm/vanilla-lazyload@17.1.0/dist/lazyload.min.js"></script>
+    <script>
+        window.lazyLoadOptions = {
+            elements_selector: ".lazy",
+            threshold: 0
+        };
+    </script>
+ 
+
+ 
+    <script>
+        window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+        ga('create', 'UA-178473615-1', 'auto');
+        ga('send', 'pageview');
+    </script>
+    <script async src="https://www.google-analytics.com/analytics.js"></script>
+ 
+
+ 
+
+ 
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement('script');
+            hm.src = 'https://hm.baidu.com/hm.js?fb2dded415192023dd108d2b441862de';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+ 
+
+ 
+
+
+
+ 
+
+
+
+ 
+
+
+    
+ 
+
+
+    
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.4.1/dist/jquery.min.js"></script>
+
+    
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.css">
+
+    
+<script src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.4.1/dist/jquery.fancybox.min.js"></script>
+
+    <script>
+        let lazyloadT = Boolean('true'),
+            auto_fancybox = Boolean('true')
+        if (auto_fancybox) {
+            $(".post__content").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        } else {
+            $(".post__content").find("fancybox").find('img').each(function () {
+                var element = document.createElement("a");
+                $(element).attr("data-fancybox", "gallery");
+                $(element).attr("href", $(this).attr("src"));
+                if (lazyloadT) {
+                    $(element).attr("href", $(this).attr("data-srcset"));
+                }
+                $(this).wrap(element);
+            });
+        }
+    </script>
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+    
+
+    
+    
+    
+
+    
+    
+    
+    <script>
+        function loadComment() {
+            let e, i;
+            (e = document.createElement("script")).src = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js',
+            document.body.appendChild(e);
+            e.onload = () => {
+                var gitalk = new Gitalk({
+                    clientID: '5343251f7191333c2cf8',
+                    clientSecret: 'c0471f2aaeafdec2f9ad0edfd4df7404db114101',
+                    repo: 'big-white-2020.github.io',
+                    owner: 'big-white-2020',
+                    admin: 'big-white-2020',
+                    id: window.location.pathname,
+                    distractionFreeMode: false
+                });
+                gitalk.render('gitalk-container');
+            };
+            (i = document.createElement("link")).rel = "stylesheet",
+            i.href = 'https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css',
+            document.head.appendChild(i);
+        }
+    
+        var runningOnBrowser = typeof window !== "undefined";
+        var isBot = runningOnBrowser && !("onscroll" in window) || typeof navigator !== "undefined" && /(gle|ing|ro|msn)bot|crawl|spider|yand|duckgo/i.test(navigator.userAgent);
+        var supportsIntersectionObserver = runningOnBrowser && "IntersectionObserver" in window;
+    
+        setTimeout(function () {
+            if (!isBot && supportsIntersectionObserver) {
+                var comment_observer = new IntersectionObserver(function(entries) {
+                    if (entries[0].isIntersecting) {
+                        loadComment();
+                        comment_observer.disconnect();
+                    }
+                }, { threshold: [0] });
+                comment_observer.observe(document.getElementById('comment'));
+            } else {
+                loadComment();
+            }
+        }, 1);
+    </script>
+
+    
+    
+
+    
+    
+    
+    
+    
+
+    
+    
+    
+
+
+
+    </body>
+</html>
